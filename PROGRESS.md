@@ -2,12 +2,13 @@
 
 ## Current Status
 
-Skratched now has a runnable local-first vertical slice. The app is self-contained, uses Python stdlib plus SQLite, serves a local browser UI, and implements deterministic capture, redaction, item risk classes, local propose/check/apply reuse-safety cards, duplicate tracking, near-duplicate revision linking, search, weighted FTS recall, filtered recall, explainable local semantic scoring, associated context, chronological neighboring capture context, tiered memory summaries, stable URL reference metadata, stable export entry IDs, redacted lifecycle events, capture/search/index timing diagnostics, append-only event hash-chain integrity, local screenshot/file artifact capture, local screenshot watch-folder scanning, a local screenshot watcher wrapper, specialized SQL extraction, specialized code extraction, context-chain graphs, compact memory-map visualization, deterministic likely-next suggestions, item edit/version history, replacement/deprecation tracking and browsing, user-defined shelves, tag editing/shorthand labels, manual filing with undo, suggest-only filing approval cards, optional AI schema validation/fallback, long-artifact chunk metadata, safe path checks, dry-run export previews, safe JSONL export/import, local atomic JSONL export-file saves, redacted bundle import previews/conflict handling, structured import failure diagnostics, chunk-manifest import/export parity checks, property/differential invariant coverage, a saved OpenRouter-key memory demo flow, a reusable browser UI smoke, generated-artifact parity tests, packaging metadata, GitHub Actions CI, broader adversarial secret-redaction fixtures, structured local health diagnostics, structured API boundary validation, explicit configuration precedence/fallback rules, and explicit local unlock/reveal auditing for sensitive values.
+Skratched now has a runnable local-first vertical slice. The app is self-contained, uses Python stdlib plus SQLite, serves a local browser UI, and implements deterministic capture, redaction, item risk classes, local propose/check/apply reuse-safety cards, duplicate tracking, near-duplicate revision linking, search, weighted FTS recall, filtered recall, explainable local semantic scoring, associated context, chronological neighboring capture context, tiered memory summaries, stable URL reference metadata, stable export entry IDs, redacted lifecycle events, capture/search/index timing diagnostics, append-only event hash-chain integrity, local screenshot/file artifact capture, local screenshot watch-folder scanning, a local screenshot watcher wrapper, specialized SQL extraction, specialized code extraction, context-chain graphs, compact memory-map visualization, deterministic likely-next suggestions, item edit/version history, replacement/deprecation tracking and browsing, user-defined shelves, tag editing/shorthand labels, manual filing with undo, suggest-only filing approval cards, optional AI schema validation/fallback, long-artifact chunk metadata, safe path checks, dry-run export previews, safe JSONL export/import, local atomic JSONL export-file saves, redacted bundle import previews/conflict handling, structured import failure diagnostics, chunk-manifest import/export parity checks, property/differential invariant coverage, a saved OpenRouter-key memory demo flow, a reusable browser UI smoke, generated-artifact parity tests, packaging metadata, GitHub Actions CI, a benefit-led README landing page with tracked screenshots, broader adversarial secret-redaction fixtures, structured local health diagnostics, structured API boundary validation, explicit configuration precedence/fallback rules, and explicit local unlock/reveal auditing for sensitive values.
 
 Current durable files:
 
 - `GOAL.md`: product objective, architecture direction, CAM mining summaries, proof-of-done criteria, and stop conditions.
 - `README.md`: run commands, verification commands, API smoke example, current slice status.
+- `docs/assets/`: generated README screenshots for workspace, context map, and redacted export preview.
 - `pyproject.toml`: package metadata and `skratched-server` console entrypoint.
 - `.github/workflows/ci.yml`: GitHub Actions verification workflow.
 - `CAM_MODEL_BAKEOFF_finESS_2026-06-17.md`: model comparison that informed the GLM/Kimi CAM mining switch.
@@ -214,6 +215,11 @@ Current durable files:
   - `tests/test_packaging.py` verifies package metadata and the console wrapper import path.
   - `tests/test_generated_artifacts.py` runs `scripts/demo_flow.py` and validates the generated proof schema and redaction invariants.
   - Clean-clone proof from `/private/tmp/skratched-clean-proof-20260619-1` at commit `3429d51` verified editable install, `skratched-server --help`, 121 tests, Python compile checks, JavaScript syntax checks, and `python scripts/demo_flow.py`.
+- README landing-page proof was added:
+  - `README.md` now leads with the user problem, why users want Skratched, competitive positioning against note apps, snippet managers, password managers, clipboard history, vector databases, and AI memory tools, plus a concise feature map.
+  - `scripts/generate_readme_screenshots.mjs` generates real UI screenshots from a temporary synthetic local store.
+  - `docs/assets/skratched-workspace.png`, `docs/assets/skratched-context-map.png`, and `docs/assets/skratched-redacted-export.png` are tracked screenshot assets.
+  - `tests/test_readme_landing.py` verifies the README landing sections, competitive positioning phrases, screenshot references, and PNG signatures.
 - Append-only event integrity was added:
   - Events now store `previous_event_hash` and `event_hash` values over redacted payload JSON plus stable event metadata.
   - Existing local databases get event-integrity columns and a deterministic backfill on store initialization.
@@ -245,7 +251,7 @@ Current durable files:
   - Missing config files fall back to defaults, invalid numeric values fail closed, config symlink paths are rejected, and config summaries redact secret-shaped values.
   - Config saves use atomic temp-file replacement and owner-only `0600` permissions.
 - Verification passed:
-  - `python -m unittest discover -s tests` now runs 121 tests.
+  - `python -m unittest discover -s tests` now runs 123 tests.
   - `python -m py_compile server.py scripts/demo_flow.py skratched/__init__.py skratched/ai.py skratched/analyze.py skratched/config.py skratched/storage.py skratched/export.py skratched/semantic.py skratched/watcher.py skratched/cli.py`
   - `node --check static/app.js`
   - `node --check scripts/browser_smoke.mjs`

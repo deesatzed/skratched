@@ -1,8 +1,82 @@
 # Skratched
 
-Skratched is a self-contained local scratchpad and experiential memory app. It stores captures in local SQLite, keeps secret previews redacted, indexes metadata for recall, tracks duplicate families, and returns associated context for memory-style searches.
+**A local-first experiential memory system for the work you keep losing in tabs, chats, terminals, screenshots, prompts, SQL, API keys, and half-finished notes.**
 
-## Run
+Skratched is not another blank notes app. It is a clean always-open scratchpad that turns messy working fragments into a searchable, connected memory layer that is redacted by default. Paste once, keep context forever, and ask for the thing the way you remember it: "find my last OpenRouter API keys added in the last 3 weeks, and provide context of associated entries."
+
+## Why Skratched Exists
+
+Most knowledge tools make you choose between speed and structure.
+
+- **Note apps** are flexible, but they depend on you naming, tagging, and organizing things while you are already busy.
+- **Snippet managers** save code, but usually miss surrounding project context, screenshots, replacements, and safety state.
+- **Password managers** protect secrets, but they are not built to remember the note, SQL query, prompt, screenshot, or terminal command that went with a key.
+- **AI memory tools** can feel smart, but many depend on cloud sync, vector databases, opaque ranking, or raw content leaving the machine.
+
+Skratched is built for the moment before you lose the thread. It captures the raw fragment, files it with deterministic local rules, preserves neighboring context, links related entries, and keeps sensitive values hidden until you explicitly unlock them locally.
+
+The core works with no cloud service and no vector database: metadata, receipts, FTS, graph links, duplicate families, and deterministic redaction come first.
+
+## Why Users Want It
+
+Use Skratched when your real work looks like this:
+
+- You pasted an API key into a terminal, then later need the safe context without exposing the key.
+- You remember a prompt, SQL query, or command by what it was for, not by its filename.
+- You have screenshots, notes, and snippets that belong together but landed in different places.
+- You revised a snippet and need the old version to point to the safer replacement.
+- You want AI-like recall without making cloud services or vector databases mandatory.
+- You want a tool that thinks ahead with likely-next suggestions, but still lets you approve filing, reveal, reuse, and import/export actions.
+
+The core payoff: Skratched turns scattered working memory into a local, inspectable, safe-to-reuse system of record.
+
+## Screenshots
+
+### Always-Open Workspace
+
+The first screen is the tool: scratchpad, quick shelves, recent captures, likely-next hints, search, and safe action buttons.
+
+![Skratched workspace with scratchpad, shelves, recent captures, redacted API key, SQL snippet, and screenshot artifact](docs/assets/skratched-workspace.png)
+
+### Context Map Instead of Plain Search Results
+
+Search can return a redacted key with linked notes, nearby captures, duplicate-family context, and a compact memory map.
+
+![Skratched context map showing linked context, memory nodes, and relationship clusters](docs/assets/skratched-context-map.png)
+
+### Redacted Export Preview
+
+Exports are designed for backup and migration: JSONL manifests, hashes, stable entry IDs, redacted previews, and no raw secret leakage.
+
+![Skratched redacted JSONL export preview with safe metadata and bundle hash](docs/assets/skratched-redacted-export.png)
+
+## How Skratched Beats the Usual Stack
+
+| Usual tool | What it does well | Where it breaks down | Skratched advantage |
+| --- | --- | --- | --- |
+| Note apps | Flexible writing and folders | Organization is manual, recall is filename/tag dependent, secrets can leak into previews | One-action capture, auto/suggest filing, redaction, explainable search, context links |
+| Snippet managers | Reuse code or commands | Weak project memory, little safety review, poor screenshot/file context | Snippets become items with receipts, risk class, versions, replacements, related artifacts |
+| Password managers | Store secrets safely | Do not preserve the work context around a secret | Secret values stay hidden while safe context remains searchable |
+| Clipboard history | Fast recovery of recent text | Short-lived, unstructured, weak search, no provenance | Durable SQLite memory with source, timestamp, project, facets, events, and graph context |
+| Vector databases | Semantic similarity at scale | Extra service dependency, opaque ranking, harder local-first setup | Metadata/FTS/graph/recency first; local semantic scoring is optional and secondary |
+| AI memory tools | Conversational retrieval | Often cloud-dependent or hard to audit | Local-first by default, deterministic fallbacks, explicit reveal/reuse/import/export controls |
+
+## Feature Map
+
+| Area | Implemented features |
+| --- | --- |
+| Capture | Always-open scratchpad, paste/type/drop flow, file and screenshot attachment capture, screenshot watch-folder scan, bounded watcher wrapper |
+| Filing | Deterministic auto-file, suggest-only filing cards, manual `File`, `Undo Filing`, user-defined shelves, tags and shorthand labels |
+| Recall | Exact search, weighted SQLite FTS, time windows, `category:` / `project:` / `tag:` / `shelf:` filters, local semantic scoring, associated-entry context |
+| Memory graph | Links, duplicate families, near-duplicate revisions, chronological neighbors, bounded two-hop context, memory-map clusters and hints |
+| Safety | Redacted previews, local reveal unlock, risk classes, propose/check/apply reuse cards, blocked destructive commands, redacted logs and diagnostics |
+| Versioning | Edit-to-successor history, replacement/deprecation tracking, replacement browser, safer successor warnings |
+| Import/export | Dry-run exports, JSONL bundles, stable export entry IDs, hashes, chunk manifests, metadata-preserving redacted restore, import diagnostics |
+| Code and data intelligence | SQL operation/table extraction, SQL normalization, code language/symbol/import extraction, command shape detection |
+| Integrity | Local SQLite schema, filesystem artifact store, event hash chain, health diagnostics for storage, FTS freshness, redaction, optional AI |
+| Proof | 123 tests, generated demo proof, generated-artifact parity checks, browser smoke, CI, clean-clone verification, `v0.1.0` tag |
+
+## Quick Start
 
 Install the package in editable mode:
 
