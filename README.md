@@ -189,7 +189,13 @@ Run the real browser UI smoke while the server is running:
 node scripts/browser_smoke.mjs --base-url http://127.0.0.1:8787
 ```
 
-The browser smoke launches local Chromium with a temporary profile, exercises the capture, search, and context-view UI flows, and prints `skratched.browser_smoke.v1` JSON proving fake OpenRouter key material stays redacted in result text and DOM.
+**Prerequisite:** this script drives a real local Chrome/Chromium binary over the DevTools protocol (no `playwright` package required). It searches, in order, `--chrome <path>`, `SKRATCHED_CHROME`, then these default locations: `/Applications/Google Chrome.app/...`, `/Applications/Chromium.app/...`, `/usr/bin/chromium`, `/usr/bin/chromium-browser`, `/usr/bin/google-chrome`. If none exist it fails fast with `No Chromium/Chrome executable found.` Install Chrome or Chromium, or point at any existing binary explicitly:
+
+```bash
+node scripts/browser_smoke.mjs --base-url http://127.0.0.1:8787 --chrome "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
+```
+
+The browser smoke launches local Chromium with a temporary profile, exercises the capture, search, and context-view UI flows, and prints `skratched.browser_smoke.v1` JSON proving fake OpenRouter key material stays redacted in result text and DOM. This step is local-only and is intentionally skipped in CI (no browser binary on CI runners); `python scripts/demo_flow.py` and the unit test suite are the CI-enforced proofs.
 
 ## Screenshot Watcher
 
