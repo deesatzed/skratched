@@ -2,12 +2,14 @@
 
 ## Current Status
 
-Skratched now has a runnable local-first vertical slice. The app is self-contained, uses Python stdlib plus SQLite, serves a local browser UI, and implements deterministic capture, redaction, item risk classes, local propose/check/apply reuse-safety cards, duplicate tracking, near-duplicate revision linking, search, weighted FTS recall, filtered recall, explainable local semantic scoring, associated context, chronological neighboring capture context, tiered memory summaries, stable URL reference metadata, stable export entry IDs, redacted lifecycle events, capture/search/index timing diagnostics, append-only event hash-chain integrity, local screenshot/file artifact capture, local screenshot watch-folder scanning, a local screenshot watcher wrapper, specialized SQL extraction, specialized code extraction, context-chain graphs, compact memory-map visualization, deterministic likely-next suggestions, item edit/version history, replacement/deprecation tracking and browsing, user-defined shelves, tag editing/shorthand labels, manual filing with undo, suggest-only filing approval cards, optional AI schema validation/fallback, long-artifact chunk metadata, safe path checks, dry-run export previews, safe JSONL export/import, local atomic JSONL export-file saves, redacted bundle import previews/conflict handling, structured import failure diagnostics, chunk-manifest import/export parity checks, property/differential invariant coverage, a saved OpenRouter-key memory demo flow, a reusable browser UI smoke, broader adversarial secret-redaction fixtures, structured local health diagnostics, structured API boundary validation, explicit configuration precedence/fallback rules, and explicit local unlock/reveal auditing for sensitive values.
+Skratched now has a runnable local-first vertical slice. The app is self-contained, uses Python stdlib plus SQLite, serves a local browser UI, and implements deterministic capture, redaction, item risk classes, local propose/check/apply reuse-safety cards, duplicate tracking, near-duplicate revision linking, search, weighted FTS recall, filtered recall, explainable local semantic scoring, associated context, chronological neighboring capture context, tiered memory summaries, stable URL reference metadata, stable export entry IDs, redacted lifecycle events, capture/search/index timing diagnostics, append-only event hash-chain integrity, local screenshot/file artifact capture, local screenshot watch-folder scanning, a local screenshot watcher wrapper, specialized SQL extraction, specialized code extraction, context-chain graphs, compact memory-map visualization, deterministic likely-next suggestions, item edit/version history, replacement/deprecation tracking and browsing, user-defined shelves, tag editing/shorthand labels, manual filing with undo, suggest-only filing approval cards, optional AI schema validation/fallback, long-artifact chunk metadata, safe path checks, dry-run export previews, safe JSONL export/import, local atomic JSONL export-file saves, redacted bundle import previews/conflict handling, structured import failure diagnostics, chunk-manifest import/export parity checks, property/differential invariant coverage, a saved OpenRouter-key memory demo flow, a reusable browser UI smoke, generated-artifact parity tests, packaging metadata, GitHub Actions CI, broader adversarial secret-redaction fixtures, structured local health diagnostics, structured API boundary validation, explicit configuration precedence/fallback rules, and explicit local unlock/reveal auditing for sensitive values.
 
 Current durable files:
 
 - `GOAL.md`: product objective, architecture direction, CAM mining summaries, proof-of-done criteria, and stop conditions.
 - `README.md`: run commands, verification commands, API smoke example, current slice status.
+- `pyproject.toml`: package metadata and `skratched-server` console entrypoint.
+- `.github/workflows/ci.yml`: GitHub Actions verification workflow.
 - `CAM_MODEL_BAKEOFF_finESS_2026-06-17.md`: model comparison that informed the GLM/Kimi CAM mining switch.
 - `CAM_KB_REASSESSMENT_2026-06-18.md`: inclusion/gap audit for newest CAM KB additions.
 - `PROGRESS.md`: this resume marker.
@@ -206,6 +208,11 @@ Current durable files:
 - Reusable real-browser UI smoke was added:
   - `scripts/browser_smoke.mjs` launches local Chromium with a temporary profile and drives the actual browser UI through capture, search, and context-view flows.
   - The smoke emits `skratched.browser_smoke.v1` JSON and checks that fake OpenRouter key material is absent from result text and final DOM.
+- Release-readiness proof was added:
+  - `pyproject.toml` defines version `0.1.0`, editable install support, and the `skratched-server` console entrypoint through `skratched.cli:main`.
+  - `.github/workflows/ci.yml` runs install, console help, unit tests, Python compile checks, JavaScript syntax checks, and the demo proof on GitHub Actions.
+  - `tests/test_packaging.py` verifies package metadata and the console wrapper import path.
+  - `tests/test_generated_artifacts.py` runs `scripts/demo_flow.py` and validates the generated proof schema and redaction invariants.
 - Append-only event integrity was added:
   - Events now store `previous_event_hash` and `event_hash` values over redacted payload JSON plus stable event metadata.
   - Existing local databases get event-integrity columns and a deterministic backfill on store initialization.
@@ -237,8 +244,8 @@ Current durable files:
   - Missing config files fall back to defaults, invalid numeric values fail closed, config symlink paths are rejected, and config summaries redact secret-shaped values.
   - Config saves use atomic temp-file replacement and owner-only `0600` permissions.
 - Verification passed:
-  - `python -m unittest discover -s tests` now runs 117 tests.
-  - `python -m py_compile server.py skratched/__init__.py skratched/ai.py skratched/analyze.py skratched/config.py skratched/storage.py skratched/export.py skratched/semantic.py skratched/watcher.py`
+  - `python -m unittest discover -s tests` now runs 121 tests.
+  - `python -m py_compile server.py scripts/demo_flow.py skratched/__init__.py skratched/ai.py skratched/analyze.py skratched/config.py skratched/storage.py skratched/export.py skratched/semantic.py skratched/watcher.py skratched/cli.py`
   - `node --check static/app.js`
   - `node --check scripts/browser_smoke.mjs`
   - `node scripts/browser_smoke.mjs --base-url http://127.0.0.1:8787` returned `skratched.browser_smoke.v1` with `ok=true`, verified capture, search, context view, memory-map rendering, and DOM-level redaction checks.
@@ -300,8 +307,8 @@ The first app slice is running locally. Continue by expanding the vertical slice
 ## Recommended Next Build Slice
 
 1. Add optional native global hotkey wrapper around the screenshot watcher if macOS automation is explicitly approved.
-2. Add optional generated-artifact parity gates.
-3. Run a completion audit against `GOAL.md` before packaging or handoff.
+2. Run release-readiness checks from a clean clone before any future release tag.
+3. Keep GitHub Actions green on `main`.
 
 The concrete CAM KB acceptance criteria now live in `GOAL.md` under `Proof Of Done`; use that section as the source of truth for the first build slice.
 

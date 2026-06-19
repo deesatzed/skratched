@@ -5,6 +5,7 @@ data/
 .env
 .env.*
 node_modules/
+*.egg-info/
 .pytest_cache/
 .coverage
 dist/

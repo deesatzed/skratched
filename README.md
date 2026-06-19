@@ -4,8 +4,16 @@ Skratched is a self-contained local scratchpad and experiential memory app. It s
 
 ## Run
 
+Install the package in editable mode:
+
 ```bash
-python server.py --host 127.0.0.1 --port 8787
+python -m pip install -e .
+```
+
+Then run the local app:
+
+```bash
+skratched-server --host 127.0.0.1 --port 8787
 ```
 
 Open:
@@ -15,6 +23,12 @@ http://127.0.0.1:8787
 ```
 
 The app writes local runtime data to `data/skratched.db`.
+
+The source checkout also supports the direct stdlib entrypoint:
+
+```bash
+python server.py --host 127.0.0.1 --port 8787
+```
 
 ## Configuration
 
@@ -34,11 +48,13 @@ Saved JSONL exports are written under `data/exports` by default. Export file wri
 
 ```bash
 python -m unittest discover -s tests
-python -m py_compile server.py skratched/__init__.py skratched/ai.py skratched/analyze.py skratched/config.py skratched/storage.py skratched/export.py skratched/semantic.py skratched/watcher.py
+python -m py_compile server.py scripts/demo_flow.py skratched/__init__.py skratched/ai.py skratched/analyze.py skratched/config.py skratched/storage.py skratched/export.py skratched/semantic.py skratched/watcher.py skratched/cli.py
 node --check static/app.js
 node --check scripts/browser_smoke.mjs
 python scripts/demo_flow.py
 ```
+
+CI runs these verification commands on GitHub Actions, along with `python -m pip install -e .` and `skratched-server --help`.
 
 Optional API smoke while the server is running:
 
@@ -80,6 +96,8 @@ python scripts/demo_flow.py
 ```
 
 The script creates a temporary local store, captures fake OpenRouter-key context, runs `find my last OpenRouter API keys added in the last 3 weeks`, and prints a redacted JSON proof that the recent key is first, associated context is present, and the stale key is excluded.
+
+Generated proof parity is covered by `tests/test_generated_artifacts.py`, which runs the demo flow and validates the documented schema and redaction invariants.
 
 Run the real browser UI smoke while the server is running:
 
@@ -149,6 +167,8 @@ Implemented:
 - Optional AI analysis adapter seam with schema-versioned validation, deterministic fallback, redacted diagnostics, safe tag/category merge, and no network requirement unless an adapter is explicitly supplied.
 - Browser UI for capture, category quick picks, recent items, search, and export preview.
 - Reusable browser smoke through `scripts/browser_smoke.mjs` for capture, search, context view, memory-map rendering, and DOM-level redaction checks against the running local UI.
+- Packaging metadata through `pyproject.toml` and the `skratched-server` console entrypoint.
+- GitHub Actions CI for install, unit tests, Python compile checks, JavaScript syntax checks, and demo-proof parity.
 - Browser file picker and drag/drop attachment capture for files and screenshot images.
 - Local screenshot watch-folder scanning through `POST /api/screenshots/scan` and the `Scan Shots` UI action, with observed path/stat metadata and duplicate-byte skipping.
 - Local screenshot watcher wrapper through `python -m skratched.watcher` and bounded `POST /api/screenshots/watch-run`, with cycle/import/skip/error counters.
@@ -192,4 +212,3 @@ Implemented:
 Still pending beyond this slice:
 
 - Optional native global hotkey wrapper around the screenshot watcher if macOS automation is explicitly approved.
-- Optional generated-artifact parity gates.

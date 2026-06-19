@@ -1,0 +1,29 @@
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "skratched"
+version = "0.1.0"
+description = "Local-first scratchpad, snippet repository, and experiential memory app."
+readme = "README.md"
+requires-python = ">=3.13"
+license = { text = "Proprietary" }
+authors = [
+  { name = "deesatzed" }
+]
+dependencies = []
+
+[project.scripts]
+skratched-server = "skratched.cli:main"
+
+[tool.setuptools]
+packages = ["skratched"]
+py-modules = ["server"]
+
+[tool.setuptools.data-files]
+static = [
+  "static/*.html",
+  "static/*.js",
+  "static/*.css",
+]
