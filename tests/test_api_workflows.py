@@ -289,6 +289,113 @@ class ApiWorkflowTests(unittest.TestCase):
         self.assertEqual(report["items"][0]["facets"]["observed_path"], str(screenshot.resolve()))
         self.assertNotIn("workflow-watcher-image", encoded)
 
+    def test_workspace_scout_preview_is_metadata_only_and_capture_is_approval_gated(self):
+        root = Path(self.tmp.name) / "workspace"
+        project = root / "demo"
+        project.mkdir(parents=True)
+        secret = project / ".env"
+        secret.write_text("OPENROUTER_API_KEY=sk-or-v1-scoutaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n", encoding="utf-8")
+        config = project / "settings.toml"
+        config.write_text("[tool]\nname='demo'\n", encoding="utf-8")
+
+        preview = self.api(
+            "POST",
+            "/api/workspace/scan-preview",
+            {"root": str(root), "type": "all", "depth": 3, "project": "workflow", "refresh": True},
+        )
+        again = self.api(
+            "POST",
+            "/api/workspace/scan-preview",
+            {"root": str(root), "type": "all", "depth": 3, "project": "workflow"},
+        )
+        encoded_preview = json.dumps({"preview": preview, "again": again})
+        candidates = {entry["name"]: entry for entry in preview["candidates"]}
+
+        self.assertEqual(preview["schema"], "skratched.workspace_scout.preview.v1")
+        self.assertEqual(preview["candidate_count"], 2)
+        self.assertEqual(again["candidate_count"], 2)
+        self.assertEqual(self.store.count_rows("workspace_candidates"), 2)
+        self.assertIn(".env", candidates)
+        self.assertEqual(candidates[".env"]["type_label"], "secrets")
+        self.assertEqual(candidates["settings.toml"]["type_label"], "configs")
+        self.assertIn("index_age_seconds", preview)
+        self.assertNotIn("sk-or-v1-scout", encoded_preview)
+        self.assertNotIn("OPENROUTER_API_KEY", encoded_preview)
+
+        new_file = project / "new-script.py"
+        new_file.write_text("print('new file requires refresh')\n", encoding="utf-8")
+        cached = self.api(
+            "POST",
+            "/api/workspace/scan-preview",
+            {"root": str(root), "type": "all", "depth": 3, "project": "workflow"},
+        )
+        refreshed = self.api(
+            "POST",
+            "/api/workspace/scan-preview",
+            {"root": str(root), "type": "all", "depth": 3, "project": "workflow", "refresh": True},
+        )
+        self.assertEqual(cached["candidate_count"], 2)
+        self.assertNotIn("new-script.py", {entry["name"] for entry in cached["candidates"]})
+        self.assertEqual(refreshed["candidate_count"], 3)
+        self.assertIn("new-script.py", {entry["name"] for entry in refreshed["candidates"]})
+
+        denied_status, denied_body = dispatch_api(
+            self.store,
+            "POST",
+            "/api/workspace/capture",
+            {"candidate_id": candidates[".env"]["id"], "import_content": True},
+        )
+        self.assertEqual(denied_status, 403)
+        self.assertIn("local unlock", denied_body["error"])
+
+        metadata_only = self.api(
+            "POST",
+            "/api/workspace/capture",
+            {"candidate_id": candidates[".env"]["id"], "project": "workflow"},
+        )["item"]
+        self.assertEqual(metadata_only["category"], "workspace-scout")
+        self.assertEqual(metadata_only["facets"]["workspace_scout_mode"], "metadata_only")
+        self.assertNotIn("sk-or-v1-scout", json.dumps(metadata_only))
+
+        imported = self.api(
+            "POST",
+            "/api/workspace/capture",
+            {
+                "candidate_id": candidates[".env"]["id"],
+                "project": "workflow",
+                "import_content": True,
+                "local_unlock": True,
+            },
+        )["item"]
+        encoded_import = json.dumps(imported)
+        self.assertEqual(imported["category"], "API-Keys")
+        self.assertIn("[REDACTED:openrouter_key]", encoded_import)
+        self.assertNotIn("sk-or-v1-scout", encoded_import)
+
+    def test_workspace_scout_rejects_symlink_roots_and_depth_limits_candidates(self):
+        root = Path(self.tmp.name) / "workspace"
+        nested = root / "project" / "deep"
+        nested.mkdir(parents=True)
+        shallow = root / "project" / "README.md"
+        deep = nested / "settings.toml"
+        shallow.write_text("# hello", encoding="utf-8")
+        deep.write_text("[tool]\nname='deep'\n", encoding="utf-8")
+        link = Path(self.tmp.name) / "workspace-link"
+        link.symlink_to(root, target_is_directory=True)
+
+        status, body = dispatch_api(self.store, "POST", "/api/workspace/scan-preview", {"root": str(link)})
+        self.assertEqual(status, 400)
+        self.assertIn("symlink", body["error"])
+
+        preview = self.api(
+            "POST",
+            "/api/workspace/scan-preview",
+            {"root": str(root), "type": "all", "depth": 2, "refresh": True},
+        )
+        names = {entry["name"] for entry in preview["candidates"]}
+        self.assertIn("README.md", names)
+        self.assertNotIn("settings.toml", names)
+
     def test_shelf_creation_workflow_is_idempotent(self):
         first = self.api("POST", "/api/shelves", {"category": "triage", "reason": "workflow shelf"})
         second = self.api("POST", "/api/shelves", {"category": "triage", "reason": "duplicate workflow shelf"})

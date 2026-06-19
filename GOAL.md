@@ -2,13 +2,14 @@
 
 ## Objective
 
-Build a self-contained, local-first app named Skratched: a clean scratchpad, cut-and-paste repository, and experiential memory system that helps a user capture, file, rediscover, connect, and safely reuse past snippets, screenshots, prompts, SQL, API keys, notes, and work artifacts.
+Build a self-contained, local-first app named Skratched: a clean scratchpad, cut-and-paste repository, workspace discovery surface, and experiential memory system that helps a user capture, file, rediscover, connect, and safely reuse past snippets, screenshots, prompts, SQL, API keys, notes, and work artifacts.
 
 The app should feel smart and anticipatory without making the workspace visually busy. The first screen is the usable memory surface: an always-open scratchpad, quick category picks, recent context, fast retrieval, and AI-assisted filing that keeps the user in control.
 
 ## Product Requirements
 
 - Provide an always-open scratchpad for rapid paste, typing, drag/drop, and screenshot capture.
+- Provide a Workspace Scout mode that scans user-approved local roots for recently changed or stale candidate files such as secrets, configs, code, screenshots, docs, and exact filenames, then presents a metadata-only preview before any content is imported.
 - Support category buttons and user-defined shelves such as `prompts`, `SQL queries`, `API-Keys`, `screenshots-work`, `screenshots-products`, `code`, `commands`, `research`, and `follow-up`.
 - Auto-file captures with undo, plus optional suggest-only and manual filing modes.
 - Keep the display clean and open: retrieval and filing helpers should appear as quick picks, inline suggestions, shelves, and context drawers instead of clutter.
@@ -34,6 +35,8 @@ Core entities:
 - `events`: append-only capture, edit, reveal, export, search, and filing history.
 - `summaries`: tiered memory summaries for recent, project, category, and long-horizon recall.
 - `safe_exports`: redacted bundles and metadata-only diffs for backup, restore, and future migration.
+- `workspace_scans`: scan runs, configured roots, file-type presets, time windows, index freshness, and aggregate scan metrics.
+- `workspace_candidates`: metadata-only discovered file candidates with path provenance, mtime, size, type label, stat fingerprint, duplicate/capture status, and approval state.
 
 Persistence and integrity:
 
@@ -41,6 +44,8 @@ Persistence and integrity:
 - Store deterministic content digests for append-only event integrity, duplicate detection, and import/export verification.
 - Use atomic writes and strict local file permissions for config, export, and sensitive metadata files.
 - Treat import/export through a storage-manager boundary so backup formats can evolve without breaking older data.
+- Treat Workspace Scout discovery as metadata-first indexing. The scout index may cache path, mtime, size, type label, scan root, and stat fingerprint, but must not store file bodies or secret values until the user explicitly approves a capture/import action.
+- Support bounded scan roots, depth limits, type presets, exact filename filters, recent/stale time windows, cache refresh controls, and stale-index diagnostics.
 
 Search and recall strategy:
 
@@ -53,6 +58,8 @@ Search and recall strategy:
 - Auto-tagging should start with deterministic, pattern-based rules before any AI call. Examples: API-key/vendor detection, SQL object extraction, code language, command shape, screenshot source, and filename/path hints.
 - SQL and code snippets should get specialized extraction when possible, including SQL entity detection, SQL splitting/title generation, normalization, language detection, and complexity scoring.
 - Large items should use bounded context assembly, skeleton extraction, and tiered summaries instead of loading entire files or histories into every operation.
+- Workspace Scout candidates should be searchable by path, filename, type, root, project, recency, stale status, and prior capture status. Candidate search should explain index age and whether the result came from a fresh scan or cached metadata.
+- Approved Workspace Scout imports should become normal Skratched items with receipts, facets, duplicate-family checks, redaction, lifecycle events, and links back to the candidate and scan run that discovered them.
 
 Safety and control model:
 
@@ -60,6 +67,8 @@ Safety and control model:
 - Use risk classes for items and actions, with at least safe, caution, sensitive, and blocked states.
 - Define explicit data-flow rules for secrets, screenshots, exports, logging, diagnostics, and optional AI analysis.
 - AI-assisted analysis must have structured output validation and a clear fallback path when the model is unavailable or returns invalid output.
+- Workspace Scout must be preview-first and approval-gated. Scanning may collect safe file metadata, but reading file content, importing broad directories, or revealing suspected secrets requires explicit local user action.
+- Secret-like candidates such as `.env`, `.key`, `.pem`, `.p12`, `.pfx`, copied credentials, and config files with likely secret material default to metadata-only candidate records unless the user explicitly unlocks or approves redacted capture.
 
 ## UX Requirements
 
@@ -70,6 +79,8 @@ Safety and control model:
 - Search should support plain language, shorthand, filters, and quick refinements.
 - Results should show context, not just snippets: why the item matched, adjacent captures, linked entries, sensitivity state, and safe actions.
 - The app should think ahead with "likely next" suggestions such as related prompts, last-used API vendor, recent project shelf, duplicate warning, or associated screenshot.
+- Workspace Scout should appear as a compact Discover/Scout drawer or panel, not a separate busy app. It should show changed/stale project groups, candidate counts, index age, safe type filters, and one-action approvals for selected captures.
+- Scout previews should make the useful next step obvious: capture selected files, ignore, mark stale, refresh scan, open related memory, or link the candidate to an existing item.
 - Failed AI analysis or import should produce a useful diagnostic view with connection/storage status and safe retry options.
 - Do not expose secret values in previews, logs, exports, screenshots, or test fixtures.
 
@@ -81,6 +92,8 @@ Safety and control model:
 - Degrade gracefully when optional services are unavailable: capture and deterministic search must continue.
 - Keep structured logs with context and timing, but redact sensitive data before it reaches logs or diagnostics.
 - Maintain explicit configuration precedence and fallback rules.
+- Workspace Scout scans must be bounded by configured roots, depth, file count, size limits, skip directories, and symlink/path traversal guards.
+- Workspace Scout cache hits must report their freshness and limitations, including whether newly created files require a refresh/full scan to appear.
 
 ## Constraints
 
@@ -90,6 +103,7 @@ Safety and control model:
 - No CAM runtime dependency.
 - No production deployment without explicit user approval.
 - No destructive filesystem, database, or secret-handling action without explicit approval.
+- No broad workspace import, recursive file-body ingestion, or secret-file content read without explicit approval after a metadata-only preview.
 - If a safe assumption is needed later, document it in `PROGRESS.md` and continue.
 - Follow the local standing rules from the user-provided `AGENTS.md` instructions.
 
@@ -194,6 +208,8 @@ The first complete development milestone should include:
 - Fixture-driven tests for representative prompts, SQL queries, API keys, screenshots, duplicate snippets, and mixed project timelines.
 - A documented verification command set.
 - Local health checks for storage, indexes, redaction, and optional AI analysis.
+- Workspace Scout proof covering configured scan roots, metadata-only candidate previews, recent/stale filters, exact filename/type filters, depth limits, cache freshness reporting, duplicate candidate suppression, approval-gated capture, and symlink/path traversal rejection.
+- Workspace Scout UI proof showing a compact Discover/Scout drawer with candidate groups, index age, safe approval actions, and no secret leakage in previews or logs.
 - A short `PROGRESS.md` update with implementation status, assumptions, and known gaps.
 - A demo flow that proves the example query: "find my last OpenRouter API keys added in the last 3 weeks, and provide context of associated entries."
 

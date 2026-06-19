@@ -45,6 +45,23 @@
             <div id="categoryChips" class="chips"></div>
             <h2>Likely Next</h2>
             <div id="likelyNext" class="quiet-list"></div>
+            <h2>Workspace Scout</h2>
+            <div class="scout-controls">
+              <input id="scoutRootInput" aria-label="Workspace root" placeholder="/path/to/workspace">
+              <div class="scout-row">
+                <select id="scoutTypeInput" aria-label="Scout file type">
+                  <option value="all">all</option>
+                  <option value="secrets">secrets</option>
+                  <option value="configs">configs</option>
+                  <option value="code">code</option>
+                  <option value="screenshots">screenshots</option>
+                  <option value="docs">docs</option>
+                </select>
+                <input id="scoutSinceInput" aria-label="Scout since" placeholder="7d">
+                <input id="scoutDepthInput" aria-label="Scout depth" placeholder="3">
+              </div>
+              <button id="workspaceScoutButton" class="secondary" type="button" title="Preview workspace candidates">Scout</button>
+            </div>
             <h2>Bundle</h2>
             <div class="bundle-actions">
               <button id="shelfButton" class="secondary" type="button" title="Create shelf">Shelf</button>

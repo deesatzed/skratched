@@ -83,6 +83,16 @@ async function seedDemo(baseUrl) {
   });
 }
 
+async function seedScoutWorkspace(tmp) {
+  const root = join(tmp, "workspace-scout-demo");
+  const project = join(root, "model-gateway");
+  await mkdir(project, { recursive: true });
+  await writeFile(join(project, ".env"), "OPENROUTER_API_KEY=sk-or-v1-screenshotdemoaaaaaaaaaaaaaaaaaaaa\n");
+  await writeFile(join(project, "settings.toml"), "[models]\nprimary='local'\n");
+  await writeFile(join(project, "release-notes.md"), "# Release notes\nWorkspace Scout should preview this file.\n");
+  return root;
+}
+
 async function connectCdp(debugPort) {
   const version = await waitForJson(`http://127.0.0.1:${debugPort}/json/version`);
   const ws = new WebSocket(version.webSocketDebuggerUrl);
@@ -145,6 +155,7 @@ async function run() {
   try {
     await waitForJson(`${baseUrl}/api/health`);
     await seedDemo(baseUrl);
+    const scoutRoot = await seedScoutWorkspace(tmp);
     const { ws: connectedWs, send } = await connectCdp(debugPort);
     ws = connectedWs;
     const target = await send("Target.createTarget", { url: "about:blank" });
@@ -195,6 +206,14 @@ async function run() {
     await waitFor("document.readyState === 'complete' && document.querySelectorAll('#recent article.item').length >= 4");
     await screenshot("skratched-workspace.png");
 
+    await evaluate(`document.querySelector('#scoutRootInput').value = ${JSON.stringify(scoutRoot)}`);
+    await evaluate("document.querySelector('#scoutTypeInput').value = 'all'");
+    await evaluate("document.querySelector('#scoutSinceInput').value = ''");
+    await evaluate("document.querySelector('#scoutDepthInput').value = '3'");
+    await evaluate("document.querySelector('#workspaceScoutButton').click()");
+    await waitFor("(document.querySelector('#results')?.innerText || '').includes('Workspace Scout') && (document.querySelector('#results')?.innerText || '').includes('settings.toml')");
+    await screenshot("skratched-workspace-scout.png");
+
     await evaluate("document.querySelector('#searchInput').value = 'find my last OpenRouter API keys added in the last 3 weeks'");
     await evaluate("document.querySelector('#searchInput').dispatchEvent(new Event('input', { bubbles: true }))");
     await evaluate("document.querySelector('#searchButton').click()");
@@ -212,6 +231,7 @@ async function run() {
       ok: true,
       assets: [
         "docs/assets/skratched-workspace.png",
+        "docs/assets/skratched-workspace-scout.png",
         "docs/assets/skratched-context-map.png",
         "docs/assets/skratched-redacted-export.png",
       ],

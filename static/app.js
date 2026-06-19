@@ -2,6 +2,7 @@ const state = {
   items: [],
   categories: [],
   tags: [],
+  scoutCandidates: [],
 };
 
 const $ = (id) => document.getElementById(id);
@@ -155,6 +156,43 @@ function itemCard(item) {
 
 function renderItems(target, items) {
   $(target).innerHTML = items.length ? items.map(itemCard).join("") : `<div class="meta">No items yet.</div>`;
+}
+
+function renderScoutCandidate(candidate) {
+  const captured = candidate.status === "captured";
+  return `
+    <article class="item scout-card">
+      <header>
+        <span class="badge">${escapeHtml(candidate.type_label)}</span>
+        <span class="meta">${escapeHtml(candidate.mtime || "")}</span>
+      </header>
+      <div class="preview">${escapeHtml(candidate.relative_path || candidate.name)}</div>
+      <div class="meta">${escapeHtml(candidate.size)} bytes · ${escapeHtml(candidate.media_type)} · ${escapeHtml(candidate.status)}</div>
+      <div class="associated">${escapeHtml(candidate.preview || "Metadata-only candidate. Content has not been imported.")}</div>
+      <div class="item-actions">
+        <button class="secondary" type="button" data-workspace-capture="${escapeHtml(candidate.id)}" ${captured ? "disabled" : ""}>Capture Metadata</button>
+        <button class="secondary" type="button" data-workspace-import="${escapeHtml(candidate.id)}" ${captured ? "disabled" : ""}>Import Content</button>
+      </div>
+    </article>
+  `;
+}
+
+function renderScoutResults(report) {
+  state.scoutCandidates = report.candidates || [];
+  const header = `
+    <article class="item scout-summary">
+      <header>
+        <span class="badge">Workspace Scout</span>
+        <span class="meta">${escapeHtml(report.candidate_count)} candidates</span>
+      </header>
+      <div class="preview">Metadata-only preview for ${escapeHtml(report.root)}</div>
+      <div class="meta">type ${escapeHtml(report.type_filter)} · scanned ${escapeHtml(report.scanned_count)} · index age ${escapeHtml(report.index_age_seconds)}s</div>
+      <div class="associated">File bodies and secret values are not read until you approve a capture.</div>
+    </article>
+  `;
+  $("results").innerHTML = header + (state.scoutCandidates.length
+    ? state.scoutCandidates.map(renderScoutCandidate).join("")
+    : `<div class="meta">No workspace candidates matched.</div>`);
 }
 
 function renderCategories() {
@@ -418,6 +456,63 @@ async function scanScreenshots() {
   await refresh();
 }
 
+async function workspaceScout() {
+  const root = $("scoutRootInput").value.trim();
+  if (!root) {
+    renderItems("results", [
+      {
+        category: "workspace-scout",
+        sensitivity: "safe",
+        preview: "Workspace Scout needs a local root path.",
+        created_at: new Date().toISOString(),
+        why: ["metadata-only scan", "user-approved root required"],
+      },
+    ]);
+    return;
+  }
+  const depthRaw = $("scoutDepthInput").value.trim();
+  const sinceRaw = $("scoutSinceInput").value.trim();
+  const body = {
+    root,
+    type: $("scoutTypeInput").value,
+    project: $("projectInput").value || undefined,
+    refresh: true,
+    limit: 40,
+  };
+  if (depthRaw) body.depth = Number(depthRaw);
+  if (sinceRaw) body.since = sinceRaw;
+  const report = await api("/api/workspace/scan-preview", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+  renderScoutResults(report);
+}
+
+async function captureWorkspaceCandidate(candidateId, importContent) {
+  const candidate = state.scoutCandidates.find((entry) => entry.id === candidateId);
+  const body = {
+    candidate_id: candidateId,
+    project: $("projectInput").value || undefined,
+    import_content: Boolean(importContent),
+  };
+  if (importContent && candidate?.type_label === "secrets") {
+    const ok = window.confirm("Import secret-like file content locally? The item will still be redacted by default.");
+    if (!ok) return;
+    body.local_unlock = true;
+  }
+  const payload = await api("/api/workspace/capture", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+  await refresh();
+  renderItems("results", [
+    {
+      ...payload.item,
+      why: [importContent ? "workspace content imported after approval" : "metadata-only workspace capture"],
+    },
+  ]);
+}
+
 function graphCard(graph) {
   const status = graph.root.deprecated ? `Deprecated -> ${graph.root.successor_id.slice(0, 8)}` : "Active";
   return {
@@ -644,6 +739,16 @@ document.addEventListener("click", (event) => {
     acceptFilingSuggestion(acceptFilingButton.dataset.acceptFiling);
     return;
   }
+  const workspaceCaptureButton = event.target.closest("button[data-workspace-capture]");
+  if (workspaceCaptureButton) {
+    captureWorkspaceCandidate(workspaceCaptureButton.dataset.workspaceCapture, false);
+    return;
+  }
+  const workspaceImportButton = event.target.closest("button[data-workspace-import]");
+  if (workspaceImportButton) {
+    captureWorkspaceCandidate(workspaceImportButton.dataset.workspaceImport, true);
+    return;
+  }
   const button = event.target.closest("button[data-category]");
   if (!button) return;
   $("searchInput").value = button.dataset.category;
@@ -662,6 +767,7 @@ $("exportButton").addEventListener("click", exportPreview);
 $("importButton").addEventListener("click", importBundle);
 $("shelfButton").addEventListener("click", createShelf);
 $("scanScreenshotsButton").addEventListener("click", scanScreenshots);
+$("workspaceScoutButton").addEventListener("click", workspaceScout);
 $("replacementsButton").addEventListener("click", showReplacements);
 $("captureText").addEventListener("dragover", (event) => {
   event.preventDefault();

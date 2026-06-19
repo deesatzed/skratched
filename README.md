@@ -1,8 +1,8 @@
 # Skratched
 
-**A local-first experiential memory system for the work you keep losing in tabs, chats, terminals, screenshots, prompts, SQL, API keys, and half-finished notes.**
+**A local-first experiential memory system for the work you keep losing in tabs, chats, terminals, screenshots, prompts, SQL, API keys, local project files, and half-finished notes.**
 
-Skratched is not another blank notes app. It is a clean always-open scratchpad that turns messy working fragments into a searchable, connected memory layer that is redacted by default. Paste once, keep context forever, and ask for the thing the way you remember it: "find my last OpenRouter API keys added in the last 3 weeks, and provide context of associated entries."
+Skratched is not another blank notes app. It is a clean always-open scratchpad plus Workspace Scout: a local discovery layer that finds important files across user-approved roots before they disappear into sprawling project folders. Paste once, scout safely, keep context forever, and ask for the thing the way you remember it: "find my last OpenRouter API keys added in the last 3 weeks, and provide context of associated entries."
 
 ## Why Skratched Exists
 
@@ -11,9 +11,10 @@ Most knowledge tools make you choose between speed and structure.
 - **Note apps** are flexible, but they depend on you naming, tagging, and organizing things while you are already busy.
 - **Snippet managers** save code, but usually miss surrounding project context, screenshots, replacements, and safety state.
 - **Password managers** protect secrets, but they are not built to remember the note, SQL query, prompt, screenshot, or terminal command that went with a key.
+- **File search tools** can find changed files, but they usually stop at paths instead of turning discoveries into safe, redacted, reusable memory.
 - **AI memory tools** can feel smart, but many depend on cloud sync, vector databases, opaque ranking, or raw content leaving the machine.
 
-Skratched is built for the moment before you lose the thread. It captures the raw fragment, files it with deterministic local rules, preserves neighboring context, links related entries, and keeps sensitive values hidden until you explicitly unlock them locally.
+Skratched is built for the moment before you lose the thread. It captures the raw fragment, scouts user-approved workspace roots for changed or stale candidates, files discoveries with deterministic local rules, preserves neighboring context, links related entries, and keeps sensitive values redacted by default until you explicitly unlock them locally.
 
 The core works with no cloud service and no vector database: metadata, receipts, FTS, graph links, duplicate families, and deterministic redaction come first.
 
@@ -24,6 +25,7 @@ Use Skratched when your real work looks like this:
 - You pasted an API key into a terminal, then later need the safe context without exposing the key.
 - You remember a prompt, SQL query, or command by what it was for, not by its filename.
 - You have screenshots, notes, and snippets that belong together but landed in different places.
+- You know an important `.env`, config, code file, screenshot, or note changed recently, but not which project folder it landed in.
 - You revised a snippet and need the old version to point to the safer replacement.
 - You want AI-like recall without making cloud services or vector databases mandatory.
 - You want a tool that thinks ahead with likely-next suggestions, but still lets you approve filing, reveal, reuse, and import/export actions.
@@ -44,6 +46,12 @@ Search can return a redacted key with linked notes, nearby captures, duplicate-f
 
 ![Skratched context map showing linked context, memory nodes, and relationship clusters](docs/assets/skratched-context-map.png)
 
+### Workspace Scout Preview
+
+Scout scans a user-approved local root for changed or stale candidates such as secrets, configs, code, screenshots, and docs. The first pass is metadata-only: paths, size, type, modified time, index age, and explicit capture/import actions.
+
+![Skratched Workspace Scout metadata-only preview showing changed local files, safe type filters, index age, and capture actions](docs/assets/skratched-workspace-scout.png)
+
 ### Redacted Export Preview
 
 Exports are designed for backup and migration: JSONL manifests, hashes, stable entry IDs, redacted previews, and no raw secret leakage.
@@ -58,6 +66,7 @@ Exports are designed for backup and migration: JSONL manifests, hashes, stable e
 | Snippet managers | Reuse code or commands | Weak project memory, little safety review, poor screenshot/file context | Snippets become items with receipts, risk class, versions, replacements, related artifacts |
 | Password managers | Store secrets safely | Do not preserve the work context around a secret | Secret values stay hidden while safe context remains searchable |
 | Clipboard history | Fast recovery of recent text | Short-lived, unstructured, weak search, no provenance | Durable SQLite memory with source, timestamp, project, facets, events, and graph context |
+| File search tools | Locate paths and recent changes | Paths are not memory, and raw file reads can expose secrets | Workspace Scout previews metadata first, then approval-gates safe capture/import into Skratched |
 | Vector databases | Semantic similarity at scale | Extra service dependency, opaque ranking, harder local-first setup | Metadata/FTS/graph/recency first; local semantic scoring is optional and secondary |
 | AI memory tools | Conversational retrieval | Often cloud-dependent or hard to audit | Local-first by default, deterministic fallbacks, explicit reveal/reuse/import/export controls |
 
@@ -66,6 +75,7 @@ Exports are designed for backup and migration: JSONL manifests, hashes, stable e
 | Area | Implemented features |
 | --- | --- |
 | Capture | Always-open scratchpad, paste/type/drop flow, file and screenshot attachment capture, screenshot watch-folder scan, bounded watcher wrapper |
+| Workspace Scout | User-approved root scans, metadata-only candidate previews, secrets/configs/code/screenshots/docs presets, depth/time filters, index age, duplicate candidate suppression, approval-gated metadata or content capture |
 | Filing | Deterministic auto-file, suggest-only filing cards, manual `File`, `Undo Filing`, user-defined shelves, tags and shorthand labels |
 | Recall | Exact search, weighted SQLite FTS, time windows, `category:` / `project:` / `tag:` / `shelf:` filters, local semantic scoring, associated-entry context |
 | Memory graph | Links, duplicate families, near-duplicate revisions, chronological neighbors, bounded two-hop context, memory-map clusters and hints |
@@ -74,7 +84,7 @@ Exports are designed for backup and migration: JSONL manifests, hashes, stable e
 | Import/export | Dry-run exports, JSONL bundles, stable export entry IDs, hashes, chunk manifests, metadata-preserving redacted restore, import diagnostics |
 | Code and data intelligence | SQL operation/table extraction, SQL normalization, code language/symbol/import extraction, command shape detection |
 | Integrity | Local SQLite schema, filesystem artifact store, event hash chain, health diagnostics for storage, FTS freshness, redaction, optional AI |
-| Proof | 123 tests, generated demo proof, generated-artifact parity checks, browser smoke, CI, clean-clone verification, `v0.1.0` tag |
+| Proof | Automated tests, generated demo proof, generated-artifact parity checks, browser smoke, CI, clean-clone verification, `v0.1.0` tag |
 
 ## Quick Start
 
@@ -244,6 +254,8 @@ Implemented:
 - Packaging metadata through `pyproject.toml` and the `skratched-server` console entrypoint.
 - GitHub Actions CI for install, unit tests, Python compile checks, JavaScript syntax checks, and demo-proof parity.
 - Browser file picker and drag/drop attachment capture for files and screenshot images.
+- Workspace Scout through `POST /api/workspace/scan-preview` and the browser Scout panel, with metadata-only previews for user-approved roots, type/time/depth filters, index age, duplicate candidate suppression, and approval-gated capture.
+- Workspace Scout capture through `POST /api/workspace/capture`, with metadata-only capture by default and explicit local unlock required before importing secret-like file content.
 - Local screenshot watch-folder scanning through `POST /api/screenshots/scan` and the `Scan Shots` UI action, with observed path/stat metadata and duplicate-byte skipping.
 - Local screenshot watcher wrapper through `python -m skratched.watcher` and bounded `POST /api/screenshots/watch-run`, with cycle/import/skip/error counters.
 - Browser import preview that verifies bundle hashes and shows importable/skipped duplicate records before apply.

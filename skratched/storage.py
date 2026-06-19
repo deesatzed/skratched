@@ -45,6 +45,65 @@ NEAR_DUPLICATE_STOP_WORDS = {
 }
 
 
+WORKSPACE_SCOUT_PRESETS = {
+    "secrets": {".env", ".key", ".pem", ".p12", ".pfx", ".secret"},
+    "configs": {".yaml", ".yml", ".toml", ".json", ".ini", ".conf"},
+    "code": {".rs", ".ts", ".tsx", ".py", ".go", ".js", ".jsx", ".mjs", ".cjs", ".sh"},
+    "screenshots": {".png", ".jpg", ".jpeg", ".webp", ".gif"},
+    "docs": {".md", ".txt", ".rst", ".pdf", ".docx"},
+}
+
+WORKSPACE_SCOUT_SKIP_DIRS = {".git", ".next", "__pycache__", "node_modules", "target", ".venv", "venv"}
+
+
+def _workspace_file_ext(path: Path) -> str:
+    name = path.name.lower()
+    if name.startswith(".") and "." not in name[1:]:
+        return name
+    return path.suffix.lower()
+
+
+def _workspace_type_label(path: Path) -> str:
+    ext = _workspace_file_ext(path)
+    for label, extensions in WORKSPACE_SCOUT_PRESETS.items():
+        if ext in extensions:
+            return label
+    return "other"
+
+
+def _workspace_matches_type(path: Path, type_spec: str | None) -> bool:
+    if not type_spec or type_spec == "all":
+        return True
+    ext = _workspace_file_ext(path)
+    if type_spec in WORKSPACE_SCOUT_PRESETS:
+        return ext in WORKSPACE_SCOUT_PRESETS[type_spec]
+    return any(ext == part.strip().lower() for part in type_spec.split(",") if part.strip())
+
+
+def _parse_workspace_time(value: str | None) -> datetime | None:
+    if not value:
+        return None
+    raw = str(value).strip().lower()
+    now = datetime.now(timezone.utc)
+    try:
+        if raw.endswith("m"):
+            return now - timedelta(minutes=int(raw[:-1]))
+        if raw.endswith("h"):
+            return now - timedelta(hours=int(raw[:-1]))
+        if raw.endswith("d"):
+            return now - timedelta(days=int(raw[:-1]))
+        parsed = datetime.fromisoformat(raw.replace("z", "+00:00"))
+        if parsed.tzinfo is None:
+            parsed = parsed.replace(tzinfo=timezone.utc)
+        return parsed.astimezone(timezone.utc)
+    except ValueError as exc:
+        raise ValueError("time values must use 30m, 2h, 7d, or ISO format") from exc
+
+
+def _system_timestamp_to_iso(timestamp: float) -> str:
+    return datetime.fromtimestamp(timestamp, tz=timezone.utc).isoformat().replace("+00:00", "Z")
+
+
 def _near_duplicate_terms(text: str) -> set[str]:
     redacted = redact_text(text)
     terms = set(re.findall(r"[a-z0-9_]+", redacted.lower()))
@@ -249,6 +308,41 @@ class SkratchedStore:
                 category TEXT NOT NULL UNIQUE,
                 reason TEXT NOT NULL,
                 created_at TEXT NOT NULL
+            );
+            CREATE TABLE IF NOT EXISTS workspace_scans (
+                id TEXT PRIMARY KEY,
+                root TEXT NOT NULL,
+                project TEXT,
+                type_filter TEXT NOT NULL,
+                filename TEXT,
+                since TEXT,
+                until_time TEXT,
+                stale_before TEXT,
+                max_depth INTEGER,
+                refresh INTEGER NOT NULL DEFAULT 0,
+                scanned_count INTEGER NOT NULL,
+                candidate_count INTEGER NOT NULL,
+                skipped_count INTEGER NOT NULL,
+                created_at TEXT NOT NULL
+            );
+            CREATE TABLE IF NOT EXISTS workspace_candidates (
+                id TEXT PRIMARY KEY,
+                scan_id TEXT NOT NULL REFERENCES workspace_scans(id) ON DELETE CASCADE,
+                root TEXT NOT NULL,
+                path TEXT NOT NULL,
+                name TEXT NOT NULL,
+                relative_path TEXT NOT NULL,
+                project TEXT,
+                type_label TEXT NOT NULL,
+                media_type TEXT NOT NULL,
+                size INTEGER NOT NULL,
+                mtime TEXT NOT NULL,
+                stat_fingerprint TEXT NOT NULL,
+                status TEXT NOT NULL,
+                captured_item_id TEXT REFERENCES items(id) ON DELETE SET NULL,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                UNIQUE(root, path)
             );
             CREATE VIRTUAL TABLE IF NOT EXISTS item_fts USING fts5(
                 item_id UNINDEXED,
@@ -486,6 +580,8 @@ class SkratchedStore:
             "safe_exports",
             "artifacts",
             "shelves",
+            "workspace_scans",
+            "workspace_candidates",
             "item_fts",
         }
         missing_tables = sorted(required_tables - set(tables))
@@ -1057,6 +1153,449 @@ class SkratchedStore:
             "skipped": skipped,
         }
 
+    def workspace_scan_preview(
+        self,
+        root: str | Path,
+        *,
+        project: str | None = None,
+        type_filter: str | None = None,
+        filename: str | None = None,
+        since: str | None = None,
+        until: str | None = None,
+        stale: str | None = None,
+        max_depth: int | None = None,
+        refresh: bool = False,
+        limit: int = 100,
+    ) -> dict[str, Any]:
+        started = time.perf_counter()
+        original = Path(root).expanduser()
+        if original.is_symlink():
+            raise ValueError("workspace scout root cannot be a symlink")
+        resolved_root = original.resolve(strict=True)
+        if not resolved_root.is_dir():
+            raise ValueError("workspace scout root is not a directory")
+        if max_depth is not None:
+            max_depth = max(0, min(int(max_depth), 25))
+        limit = max(1, min(int(limit), 250))
+        safe_type = str(type_filter or "all").strip() or "all"
+        safe_filename = str(filename or "").strip() or None
+        since_dt = _parse_workspace_time(since)
+        until_dt = _parse_workspace_time(until)
+        stale_dt = _parse_workspace_time(stale)
+        previous_index_age_seconds = self._workspace_index_age_seconds(str(resolved_root))
+
+        scan_id = str(uuid.uuid4())
+        created = utc_now_iso()
+        self.conn.execute(
+            """
+            INSERT INTO workspace_scans (
+                id, root, project, type_filter, filename, since, until_time,
+                stale_before, max_depth, refresh, scanned_count, candidate_count,
+                skipped_count, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                scan_id,
+                str(resolved_root),
+                project,
+                safe_type,
+                safe_filename,
+                since,
+                until,
+                stale,
+                max_depth,
+                1 if refresh else 0,
+                0,
+                0,
+                0,
+                created,
+            ),
+        )
+        if not refresh:
+            cached_candidates = self._workspace_cached_candidates(
+                str(resolved_root),
+                type_filter=safe_type,
+                filename=safe_filename,
+                since_dt=since_dt,
+                until_dt=until_dt,
+                stale_dt=stale_dt,
+                max_depth=max_depth,
+                limit=limit,
+            )
+            if cached_candidates:
+                self.conn.execute(
+                    "UPDATE workspace_scans SET scanned_count = ?, candidate_count = ?, skipped_count = ? WHERE id = ?",
+                    (0, len(cached_candidates), 0, scan_id),
+                )
+                elapsed = (time.perf_counter() - started) * 1000
+                self._event(
+                    "workspace_scout.scan_previewed",
+                    None,
+                    {
+                        "scan_id": scan_id,
+                        "root": str(resolved_root),
+                        "project": project,
+                        "type_filter": safe_type,
+                        "candidate_count": len(cached_candidates),
+                        "scanned_count": 0,
+                        "metadata_only": True,
+                        "cache_hit": True,
+                        "timing": {"total_ms": round(elapsed, 3)},
+                    },
+                    elapsed,
+                )
+                self.conn.commit()
+                return {
+                    "schema": "skratched.workspace_scout.preview.v1",
+                    "scan_id": scan_id,
+                    "root": str(resolved_root),
+                    "project": project,
+                    "type_filter": safe_type,
+                    "filename": safe_filename,
+                    "since": since,
+                    "until": until,
+                    "stale": stale,
+                    "max_depth": max_depth,
+                    "metadata_only": True,
+                    "cache_hit": True,
+                    "index_age_seconds": previous_index_age_seconds,
+                    "scanned_count": 0,
+                    "candidate_count": len(cached_candidates),
+                    "skipped_count": 0,
+                    "candidates": cached_candidates,
+                }
+        candidates: list[dict[str, Any]] = []
+        skipped_count = 0
+        scanned_count = 0
+
+        for current, dirnames, filenames in os.walk(resolved_root):
+            current_path = Path(current)
+            dirnames[:] = [
+                name
+                for name in dirnames
+                if name not in WORKSPACE_SCOUT_SKIP_DIRS and not (current_path / name).is_symlink()
+            ]
+            rel_dir = current_path.relative_to(resolved_root)
+            dir_depth = 0 if str(rel_dir) == "." else len(rel_dir.parts)
+            if max_depth is not None and dir_depth >= max_depth:
+                dirnames[:] = []
+            for name in filenames:
+                path = current_path / name
+                if path.is_symlink() or not path.is_file():
+                    skipped_count += 1
+                    continue
+                rel = path.relative_to(resolved_root)
+                depth = len(rel.parts)
+                if max_depth is not None and depth > max_depth:
+                    skipped_count += 1
+                    continue
+                scanned_count += 1
+                if safe_filename and name != safe_filename:
+                    continue
+                if not _workspace_matches_type(path, safe_type):
+                    continue
+                stat = path.stat()
+                mtime_dt = datetime.fromtimestamp(stat.st_mtime, tz=timezone.utc)
+                if since_dt and mtime_dt < since_dt:
+                    continue
+                if until_dt and mtime_dt > until_dt:
+                    continue
+                if stale_dt and mtime_dt >= stale_dt:
+                    continue
+                type_label = _workspace_type_label(path)
+                media_type = mimetypes.guess_type(str(path))[0] or "application/octet-stream"
+                path_resolved = path.resolve(strict=True)
+                stat_fingerprint = f"size={stat.st_size};mtime_ns={stat.st_mtime_ns};inode={getattr(stat, 'st_ino', 0)}"
+                candidate_id = f"wsc_{hashlib.sha256(str(path_resolved).encode('utf-8')).hexdigest()[:20]}"
+                captured = self.conn.execute(
+                    "SELECT item_id FROM receipts WHERE path = ? ORDER BY created_at DESC LIMIT 1",
+                    (str(path_resolved),),
+                ).fetchone()
+                existing = self.conn.execute(
+                    "SELECT captured_item_id FROM workspace_candidates WHERE root = ? AND path = ?",
+                    (str(resolved_root), str(path_resolved)),
+                ).fetchone()
+                captured_item_id = (
+                    str(captured["item_id"])
+                    if captured and captured["item_id"]
+                    else (str(existing["captured_item_id"]) if existing and existing["captured_item_id"] else None)
+                )
+                status = "captured" if captured_item_id else "candidate"
+                self.conn.execute(
+                    """
+                    INSERT INTO workspace_candidates (
+                        id, scan_id, root, path, name, relative_path, project, type_label,
+                        media_type, size, mtime, stat_fingerprint, status, captured_item_id,
+                        created_at, updated_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ON CONFLICT(root, path) DO UPDATE SET
+                        scan_id = excluded.scan_id,
+                        project = excluded.project,
+                        type_label = excluded.type_label,
+                        media_type = excluded.media_type,
+                        size = excluded.size,
+                        mtime = excluded.mtime,
+                        stat_fingerprint = excluded.stat_fingerprint,
+                        status = excluded.status,
+                        captured_item_id = COALESCE(workspace_candidates.captured_item_id, excluded.captured_item_id),
+                        updated_at = excluded.updated_at
+                    """,
+                    (
+                        candidate_id,
+                        scan_id,
+                        str(resolved_root),
+                        str(path_resolved),
+                        name,
+                        rel.as_posix(),
+                        project,
+                        type_label,
+                        media_type,
+                        int(stat.st_size),
+                        _system_timestamp_to_iso(stat.st_mtime),
+                        stat_fingerprint,
+                        status,
+                        captured_item_id,
+                        created,
+                        created,
+                    ),
+                )
+                candidate = self._workspace_candidate_by_id(candidate_id)
+                if candidate:
+                    candidates.append(candidate)
+                if len(candidates) >= limit:
+                    break
+            if len(candidates) >= limit:
+                break
+
+        self.conn.execute(
+            "UPDATE workspace_scans SET scanned_count = ?, candidate_count = ?, skipped_count = ? WHERE id = ?",
+            (scanned_count, len(candidates), skipped_count, scan_id),
+        )
+        elapsed = (time.perf_counter() - started) * 1000
+        self._event(
+            "workspace_scout.scan_previewed",
+            None,
+            {
+                "scan_id": scan_id,
+                "root": str(resolved_root),
+                "project": project,
+                "type_filter": safe_type,
+                "candidate_count": len(candidates),
+                "scanned_count": scanned_count,
+                "metadata_only": True,
+                "timing": {"total_ms": round(elapsed, 3)},
+            },
+            elapsed,
+        )
+        self.conn.commit()
+        return {
+            "schema": "skratched.workspace_scout.preview.v1",
+            "scan_id": scan_id,
+            "root": str(resolved_root),
+            "project": project,
+            "type_filter": safe_type,
+            "filename": safe_filename,
+            "since": since,
+            "until": until,
+            "stale": stale,
+            "max_depth": max_depth,
+            "metadata_only": True,
+            "cache_hit": False,
+            "index_age_seconds": self._workspace_index_age_seconds(str(resolved_root)),
+            "scanned_count": scanned_count,
+            "candidate_count": len(candidates),
+            "skipped_count": skipped_count,
+            "candidates": candidates,
+        }
+
+    def capture_workspace_candidate(
+        self,
+        candidate_id: str,
+        *,
+        project: str | None = None,
+        import_content: bool = False,
+        local_unlock: bool = False,
+    ) -> dict[str, Any]:
+        candidate = self._workspace_candidate_by_id(candidate_id)
+        if not candidate:
+            raise ValueError("workspace candidate not found")
+        path = Path(str(candidate["path"]))
+        if path.is_symlink():
+            raise ValueError("workspace candidate path cannot be a symlink")
+        if not path.is_file():
+            raise ValueError("workspace candidate path is not a file")
+        type_label = str(candidate["type_label"])
+        chosen_project = project or candidate.get("project")
+        if import_content and type_label == "secrets" and not local_unlock:
+            raise PermissionError("local unlock is required before importing secret-like workspace content")
+
+        facets = {
+            "workspace_scout_candidate_id": candidate_id,
+            "workspace_scout_scan_id": candidate["scan_id"],
+            "workspace_scout_root": candidate["root"],
+            "workspace_scout_path": candidate["path"],
+            "workspace_scout_relative_path": candidate["relative_path"],
+            "workspace_scout_type": type_label,
+            "workspace_scout_mtime": candidate["mtime"],
+            "stat_fingerprint": candidate["stat_fingerprint"],
+        }
+        if not import_content:
+            text = "\n".join(
+                [
+                    f"Workspace Scout candidate: {candidate['relative_path']}",
+                    f"Type: {type_label}",
+                    f"Modified: {candidate['mtime']}",
+                    f"Size: {candidate['size']} bytes",
+                    "Mode: metadata only",
+                ]
+            )
+            item = self.capture(
+                text,
+                source="workspace-scout",
+                project=chosen_project,
+                path=str(candidate["path"]),
+            )
+            item = self._force_item_category_and_facets(
+                item["id"],
+                "workspace-scout",
+                {
+                    **facets,
+                    "workspace_scout_mode": "metadata_only",
+                    "tags": ["workspace-scout", type_label],
+                    "risk_class": "safe",
+                    "risk_reasons": ["metadata-only workspace candidate"],
+                },
+            )
+        elif type_label == "screenshots" or str(candidate["media_type"]).startswith("image/"):
+            item = self.capture_artifact(
+                filename=str(candidate["name"]),
+                content=path.read_bytes(),
+                media_type=str(candidate["media_type"]),
+                source="workspace-scout",
+                project=chosen_project,
+                extra_facets={**facets, "workspace_scout_mode": "content_import"},
+            )
+        else:
+            try:
+                text = path.read_text(encoding="utf-8")
+            except UnicodeDecodeError:
+                item = self.capture_artifact(
+                    filename=str(candidate["name"]),
+                    content=path.read_bytes(),
+                    media_type=str(candidate["media_type"]),
+                    source="workspace-scout",
+                    project=chosen_project,
+                    extra_facets={**facets, "workspace_scout_mode": "content_import"},
+                )
+            else:
+                item = self.capture(
+                    text,
+                    source="workspace-scout",
+                    project=chosen_project,
+                    path=str(candidate["path"]),
+                )
+                item = self._merge_item_facets(item["id"], {**facets, "workspace_scout_mode": "content_import"})
+
+        self.conn.execute(
+            """
+            UPDATE workspace_candidates
+            SET status = 'captured', captured_item_id = ?, updated_at = ?
+            WHERE id = ?
+            """,
+            (item["id"], utc_now_iso(), candidate_id),
+        )
+        self._event(
+            "workspace_scout.candidate_captured",
+            item["id"],
+            {
+                "candidate_id": candidate_id,
+                "mode": "content_import" if import_content else "metadata_only",
+                "type_label": type_label,
+                "path": str(candidate["path"]),
+            },
+        )
+        self.conn.commit()
+        return self.get_item(item["id"])
+
+    def _workspace_candidate_by_id(self, candidate_id: str) -> dict[str, Any] | None:
+        row = self.conn.execute("SELECT * FROM workspace_candidates WHERE id = ?", (candidate_id,)).fetchone()
+        if not row:
+            return None
+        return {
+            "id": row["id"],
+            "scan_id": row["scan_id"],
+            "root": row["root"],
+            "path": row["path"],
+            "name": row["name"],
+            "relative_path": row["relative_path"],
+            "project": row["project"],
+            "type_label": row["type_label"],
+            "media_type": row["media_type"],
+            "size": int(row["size"]),
+            "mtime": row["mtime"],
+            "stat_fingerprint": row["stat_fingerprint"],
+            "status": row["status"],
+            "captured_item_id": row["captured_item_id"],
+            "metadata_only": True,
+            "preview": f"{row['type_label']}: {row['relative_path']} ({row['size']} bytes, modified {row['mtime']})",
+        }
+
+    def _workspace_index_age_seconds(self, root: str) -> int:
+        row = self.conn.execute(
+            "SELECT created_at FROM workspace_scans WHERE root = ? ORDER BY created_at DESC LIMIT 1",
+            (root,),
+        ).fetchone()
+        if not row:
+            return 0
+        try:
+            created = _parse_iso(str(row["created_at"]))
+            return max(0, int((datetime.now(timezone.utc) - created).total_seconds()))
+        except ValueError:
+            return 0
+
+    def _workspace_cached_candidates(
+        self,
+        root: str,
+        *,
+        type_filter: str,
+        filename: str | None,
+        since_dt: datetime | None,
+        until_dt: datetime | None,
+        stale_dt: datetime | None,
+        max_depth: int | None,
+        limit: int,
+    ) -> list[dict[str, Any]]:
+        rows = self.conn.execute(
+            "SELECT id FROM workspace_candidates WHERE root = ? ORDER BY mtime DESC, relative_path LIMIT 1000",
+            (root,),
+        ).fetchall()
+        candidates: list[dict[str, Any]] = []
+        for row in rows:
+            candidate = self._workspace_candidate_by_id(str(row["id"]))
+            if not candidate:
+                continue
+            path = Path(str(candidate["path"]))
+            if filename and candidate["name"] != filename:
+                continue
+            if type_filter and type_filter != "all" and not _workspace_matches_type(path, type_filter):
+                continue
+            if max_depth is not None and len(str(candidate["relative_path"]).split("/")) > max_depth:
+                continue
+            try:
+                mtime_dt = _parse_iso(str(candidate["mtime"]))
+            except ValueError:
+                continue
+            if since_dt and mtime_dt < since_dt:
+                continue
+            if until_dt and mtime_dt > until_dt:
+                continue
+            if stale_dt and mtime_dt >= stale_dt:
+                continue
+            candidates.append(candidate)
+            if len(candidates) >= limit:
+                break
+        return candidates
+
     def _looks_like_screenshot(self, path: Path) -> bool:
         suffix = path.suffix.lower()
         if suffix not in {".png", ".jpg", ".jpeg", ".webp", ".heic"}:
@@ -1071,6 +1610,62 @@ class SkratchedStore:
         if "screenshot" in haystack or media_type.lower().startswith("image/") or source.startswith("screenshot"):
             return "screenshots-work"
         return "files"
+
+    def _merge_item_facets(self, item_id: str, facets: dict[str, Any]) -> dict[str, Any]:
+        row = self.conn.execute("SELECT * FROM items WHERE id = ?", (item_id,)).fetchone()
+        if not row:
+            raise KeyError(item_id)
+        analysis = json.loads(row["analysis_json"])
+        merged = dict(analysis.get("facets") or {})
+        merged.update(facets)
+        analysis["facets"] = merged
+        now = utc_now_iso()
+        self.conn.execute("UPDATE items SET analysis_json = ?, updated_at = ? WHERE id = ?", (json.dumps(analysis, sort_keys=True), now, item_id))
+        for key, value in facets.items():
+            self.conn.execute("DELETE FROM facets WHERE item_id = ? AND key = ?", (item_id, key))
+            values = value if isinstance(value, list) else [value]
+            for facet_value in values:
+                if facet_value is not None:
+                    self.conn.execute(
+                        "INSERT INTO facets (item_id, key, value) VALUES (?, ?, ?)",
+                        (item_id, key, str(facet_value)),
+                    )
+        self.conn.execute("DELETE FROM item_fts WHERE item_id = ?", (item_id,))
+        self.conn.execute(
+            "INSERT INTO item_fts (item_id, content, preview, category, project, facets) VALUES (?, ?, ?, ?, ?, ?)",
+            (item_id, row["content"], row["preview"], row["category"], row["project"] or "", json.dumps(merged, sort_keys=True)),
+        )
+        return self.get_item(item_id)
+
+    def _force_item_category_and_facets(self, item_id: str, category: str, facets: dict[str, Any]) -> dict[str, Any]:
+        row = self.conn.execute("SELECT * FROM items WHERE id = ?", (item_id,)).fetchone()
+        if not row:
+            raise KeyError(item_id)
+        analysis = json.loads(row["analysis_json"])
+        merged = dict(analysis.get("facets") or {})
+        merged.update(facets)
+        analysis["category"] = category
+        analysis["facets"] = merged
+        now = utc_now_iso()
+        self.conn.execute(
+            "UPDATE items SET category = ?, analysis_json = ?, updated_at = ? WHERE id = ?",
+            (category, json.dumps(analysis, sort_keys=True), now, item_id),
+        )
+        self.conn.execute("DELETE FROM facets WHERE item_id = ?", (item_id,))
+        for key, value in merged.items():
+            values = value if isinstance(value, list) else [value]
+            for facet_value in values:
+                if facet_value is not None:
+                    self.conn.execute(
+                        "INSERT INTO facets (item_id, key, value) VALUES (?, ?, ?)",
+                        (item_id, key, str(facet_value)),
+                    )
+        self.conn.execute("DELETE FROM item_fts WHERE item_id = ?", (item_id,))
+        self.conn.execute(
+            "INSERT INTO item_fts (item_id, content, preview, category, project, facets) VALUES (?, ?, ?, ?, ?, ?)",
+            (item_id, row["content"], row["preview"], category, row["project"] or "", json.dumps(merged, sort_keys=True)),
+        )
+        return self.get_item(item_id)
 
     def get_item(self, item_id: str) -> dict[str, Any]:
         row = self.conn.execute("SELECT * FROM items WHERE id = ?", (item_id,)).fetchone()

@@ -191,6 +191,24 @@ textarea.is-dragging {
   font-size: 13px;
 }
 
+.scout-controls {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.scout-controls input,
+.scout-controls select,
+.scout-controls button {
+  width: 100%;
+}
+
+.scout-row {
+  display: grid;
+  grid-template-columns: 1.1fr 0.8fr 0.6fr;
+  gap: 6px;
+}
+
 .search-area {
   grid-template-columns: 1fr auto;
   margin: 16px 0;
@@ -219,6 +237,15 @@ textarea.is-dragging {
   border-radius: 8px;
   padding: 10px;
   background: #fff;
+}
+
+.scout-card {
+  border-left: 4px solid var(--blue);
+}
+
+.scout-summary {
+  border-left: 4px solid var(--teal);
+  background: #f6fbf9;
 }
 
 .item header {

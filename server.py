@@ -230,6 +230,39 @@ def dispatch_api(store: SkratchedStore, method: str, path: str, payload: dict | 
             return 400, _safe_error(exc)
         return 200, report
 
+    if parsed.path == "/api/workspace/scan-preview":
+        root = _required_string(payload, "root")
+        try:
+            report = store.workspace_scan_preview(
+                root,
+                project=_optional_string(payload, "project") or None,
+                type_filter=_optional_string(payload, "type", "all") or "all",
+                filename=_optional_string(payload, "file") or None,
+                since=_optional_string(payload, "since") or None,
+                until=_optional_string(payload, "until") or None,
+                stale=_optional_string(payload, "stale") or None,
+                max_depth=_bounded_int(payload, "depth", default=5, minimum=0, maximum=25) if "depth" in payload else None,
+                refresh=bool(payload.get("refresh")),
+                limit=_bounded_int(payload, "limit", default=100, minimum=1, maximum=250),
+            )
+        except (ApiValidationError, ValueError, OSError) as exc:
+            return 400, _safe_error(exc)
+        return 200, report
+
+    if parsed.path == "/api/workspace/capture":
+        try:
+            item = store.capture_workspace_candidate(
+                _required_string(payload, "candidate_id"),
+                project=_optional_string(payload, "project") or None,
+                import_content=bool(payload.get("import_content")),
+                local_unlock=bool(payload.get("local_unlock")),
+            )
+        except PermissionError as exc:
+            return 403, _safe_error(exc)
+        except (ApiValidationError, ValueError, OSError, KeyError) as exc:
+            return 400, _safe_error(exc)
+        return 201, {"item": item}
+
     if parsed.path == "/api/link":
         try:
             store.link_items(

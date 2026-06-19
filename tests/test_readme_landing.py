@@ -28,9 +28,14 @@ class ReadmeLandingTests(unittest.TestCase):
             "experiential memory",
             "redacted by default",
             "no vector database",
+            "workspace scout",
+            "metadata-only",
+            "approval-gated",
+            "user-approved root",
             "note apps",
             "snippet managers",
             "password managers",
+            "file search tools",
             "ai memory tools",
         ]
         lower = text.lower()
@@ -42,6 +47,7 @@ class ReadmeLandingTests(unittest.TestCase):
         text = README.read_text(encoding="utf-8")
         screenshots = [
             ASSETS / "skratched-workspace.png",
+            ASSETS / "skratched-workspace-scout.png",
             ASSETS / "skratched-context-map.png",
             ASSETS / "skratched-redacted-export.png",
         ]
