@@ -213,6 +213,7 @@ Current durable files:
   - `.github/workflows/ci.yml` runs install, console help, unit tests, Python compile checks, JavaScript syntax checks, and the demo proof on GitHub Actions.
   - `tests/test_packaging.py` verifies package metadata and the console wrapper import path.
   - `tests/test_generated_artifacts.py` runs `scripts/demo_flow.py` and validates the generated proof schema and redaction invariants.
+  - Clean-clone proof from `/private/tmp/skratched-clean-proof-20260619-1` at commit `3429d51` verified editable install, `skratched-server --help`, 121 tests, Python compile checks, JavaScript syntax checks, and `python scripts/demo_flow.py`.
 - Append-only event integrity was added:
   - Events now store `previous_event_hash` and `event_hash` values over redacted payload JSON plus stable event metadata.
   - Existing local databases get event-integrity columns and a deterministic backfill on store initialization.
