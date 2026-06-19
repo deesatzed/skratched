@@ -1,0 +1,312 @@
+# PROGRESS.md
+
+## Current Status
+
+Skratched now has a runnable local-first vertical slice. The app is self-contained, uses Python stdlib plus SQLite, serves a local browser UI, and implements deterministic capture, redaction, item risk classes, local propose/check/apply reuse-safety cards, duplicate tracking, near-duplicate revision linking, search, weighted FTS recall, filtered recall, explainable local semantic scoring, associated context, chronological neighboring capture context, tiered memory summaries, stable URL reference metadata, stable export entry IDs, redacted lifecycle events, capture/search/index timing diagnostics, append-only event hash-chain integrity, local screenshot/file artifact capture, local screenshot watch-folder scanning, a local screenshot watcher wrapper, specialized SQL extraction, specialized code extraction, context-chain graphs, compact memory-map visualization, deterministic likely-next suggestions, item edit/version history, replacement/deprecation tracking and browsing, user-defined shelves, tag editing/shorthand labels, manual filing with undo, suggest-only filing approval cards, optional AI schema validation/fallback, long-artifact chunk metadata, safe path checks, dry-run export previews, safe JSONL export/import, local atomic JSONL export-file saves, redacted bundle import previews/conflict handling, structured import failure diagnostics, chunk-manifest import/export parity checks, property/differential invariant coverage, a saved OpenRouter-key memory demo flow, a reusable browser UI smoke, broader adversarial secret-redaction fixtures, structured local health diagnostics, structured API boundary validation, explicit configuration precedence/fallback rules, and explicit local unlock/reveal auditing for sensitive values.
+
+Current durable files:
+
+- `GOAL.md`: product objective, architecture direction, CAM mining summaries, proof-of-done criteria, and stop conditions.
+- `README.md`: run commands, verification commands, API smoke example, current slice status.
+- `CAM_MODEL_BAKEOFF_finESS_2026-06-17.md`: model comparison that informed the GLM/Kimi CAM mining switch.
+- `CAM_KB_REASSESSMENT_2026-06-18.md`: inclusion/gap audit for newest CAM KB additions.
+- `PROGRESS.md`: this resume marker.
+- `server.py`, `skratched/`, `static/`, `tests/`: first runnable app slice.
+
+## Latest Work Completed
+
+- Active CAM runtime was switched to `z-ai/glm-5.2` as primary and `moonshotai/kimi-k2.7-code` as secondary/fallback.
+- Mining request time windows were extended.
+- Focused CAM mining completed for:
+  - `/Volumes/WS4TB/repo421sn/storm`
+  - `/Volumes/WS4TB/repo421sn/codexpro`
+  - `/Volumes/WS4TB/repo421sn/privacy-filter.cpp`
+- The focused mine saved 42 total findings for Skratched and generated 0 tasks by design.
+- `GOAL.md` was updated with the new mining results and carry-forward methods.
+- The newest CAM KB additions were reassessed against the Skratched plan. Most were already represented broadly; the valuable gaps were promoted into explicit acceptance criteria in `CAM_KB_REASSESSMENT_2026-06-18.md`.
+- First runnable app slice was implemented with local SQLite persistence, deterministic analysis, redacted previews, duplicate-family tracking, associated-context search, safe dry-run export, and a clean browser UI.
+- Sensitive reveal and redacted import/restore were added:
+  - Sensitive raw values are denied unless `local_unlock` is explicit.
+  - Reveal events are recorded without storing the raw secret in event payloads.
+  - Redacted export bundles can be imported as metadata-only restored records after hash verification.
+- Context graph and replacement/deprecation support were added:
+  - `GET /api/context` returns nodes and typed edges for associated links, duplicate-family peers, and replacement chains.
+  - Search result `associated` context now includes both outgoing and incoming links, with `link_type`, `link_direction`, and link timestamp metadata.
+  - `POST /api/replace` records successor relationships and marks the old item deprecated in context views.
+  - `GET /api/replacements` lists deprecated old items with their successor records and reasons.
+  - Normal list/search item payloads now include deprecated status, successor metadata, and replacement reasons.
+  - The browser UI includes Context, Replace, and Replacements actions on memory items.
+- Item edit/version history was added:
+  - `SkratchedStore.edit_item` creates a successor item from edited content, preserves the source project, records an `edited_to` row in `item_versions`, links old to new, and marks the old item deprecated.
+  - `SkratchedStore.version_history` returns a schema-versioned linear history with ordered items and version edges.
+  - `GET /api/versions` exposes version history, and `POST /api/items/edit` exposes edit-to-successor through the local API.
+  - Browser item cards now include a compact `Edit` action that creates a version successor.
+  - Edit reasons and version events are redacted before persistence, so fake key material does not leak through history or audit payloads.
+- Optional local semantic scoring was added without a vector database:
+  - Plain-language credential intent can bridge to local `API-Keys` metadata and OpenRouter/key/secret facets.
+  - Search results expose `exact`, `metadata`, `semantic`, and `total` score components.
+  - Semantic scoring remains secondary to explicit metadata and exact matches, with tests proving SQL/category matches can outrank generic credential intent.
+- Specialized SQL extraction was added:
+  - SQL captures now get statement counts, operation lists, table/entity lists, normalized SQL, generated titles, and simple complexity tiers.
+  - SQL operation/table metadata is stored in facets and FTS metadata, so table names and operations are searchable without loading raw histories.
+  - SQL normalization has a whitespace-variant invariant test, and metadata search is covered by store tests.
+- Specialized code extraction was added:
+  - Code captures now get language, symbol, import, generated title, line-count, branch-count, and complexity facets.
+  - Python extraction covers imports, `from ... import ...`, classes, functions, and methods.
+  - JavaScript/TypeScript extraction covers import sources, function declarations, and arrow-function assignments while preserving source-order symbols.
+  - TypeScript extraction now handles typed arrow functions with parameter/return annotations and whitespace variants.
+  - Shell extraction now classifies shell-file snippets as code and extracts shell functions plus command hints.
+  - Malformed JavaScript snippets stay safely classified as code without inventing symbols.
+  - Code metadata is stored in facets and indexed search metadata, so symbol/import queries can retrieve snippets without loading broader histories.
+  - Code extraction tests cover Python, JavaScript, TypeScript, shell, malformed JavaScript, whitespace-stable metadata, and searchable metadata through the store.
+- Local screenshot/file artifact capture was added:
+  - `POST /api/capture-file` accepts JSON/base64 file payloads using only Python stdlib.
+  - Artifact bytes are stored under `data/artifacts` and tracked in a new SQLite `artifacts` table.
+  - File duplicate families use the byte content hash, so renamed duplicate screenshots still group together.
+  - Browser UI now supports the `Attach` file picker and drag/drop on the scratchpad.
+- Local screenshot watch-folder scanning was added:
+  - `POST /api/screenshots/scan` scans a user-provided directory, defaulting to Desktop when invoked blank through the UI.
+  - The scanner imports direct-child screenshot image files with names like `Screenshot...`, records observed path and stat fingerprint metadata, and stores bytes through the existing artifact path.
+  - Duplicate screenshot bytes are skipped by artifact hash on repeat scans instead of creating duplicate items.
+  - Symlink screenshot directories are rejected, non-screenshot files are ignored, and scan size is bounded.
+  - Browser UI now includes a compact `Scan Shots` action.
+- Local screenshot watcher wrapper was added:
+  - `skratched/watcher.py` provides a stdlib-only polling wrapper around `scan_screenshot_watch`.
+  - `python -m skratched.watcher` can run continuous local polling, or bounded smoke runs with `--max-cycles`.
+  - `POST /api/screenshots/watch-run` exposes the same watcher path through the app API, capped to 25 cycles so API calls stay bounded.
+  - Watcher reports include cycle count, imported/skipped/error counts, stopped reason, imported item metadata, and duplicate skip records.
+  - Tests cover later-cycle imports, duplicate skips across cycles, and API dispatcher access.
+- Redacted import preview/conflict handling was added:
+  - `POST /api/import/preview` verifies bundle hashes before apply and returns entry-level actions.
+  - Existing local content hashes are marked `skip_existing_duplicate`.
+  - Repeated entries inside the same bundle are marked `skip_bundle_duplicate`.
+  - `POST /api/import/redacted` imports only preview-classified importable entries and reports imported/skipped counts.
+  - Redacted export bundles now carry allowlisted structured facets such as tags, SQL metadata, code metadata, vendors, source, filename, and non-path artifact metadata.
+  - Redacted imports now restore those safe facets into `analysis_json`, the `facets` table, and FTS metadata so restored records remain searchable by tags, SQL tables, SQL operations, code symbols, and code imports.
+  - Local path/fingerprint facets such as observed screenshot paths, stat fingerprints, watch directories, and artifact storage paths are excluded from redacted bundles.
+  - Browser import now shows the preview counts/actions and asks before applying importable records.
+- Manual filing and undo controls were added:
+  - `POST /api/refile` moves an item into a user-selected category and marks the item with manual filing facets.
+  - `POST /api/undo-filing` restores the previous category from the latest matching filing event.
+  - Refile and undo operations update item metadata, FTS/category search, category counts, and append-only audit events.
+  - Browser item cards now include compact `File` and `Undo Filing` actions.
+- User-defined shelves were added:
+  - A durable `shelves` table stores user-created category shelves even before any items exist in them.
+  - `POST /api/shelves` uses idempotent `INSERT OR IGNORE` semantics and reuses existing shelves on duplicate creation.
+  - `GET /api/categories` now returns shelf-only categories with count `0`, so quick picks can show empty shelves.
+  - Refiling into a new category creates/reuses the shelf before updating item metadata.
+  - Browser quick picks now include a compact `Shelf` action.
+- Tag editing and shorthand labels were added:
+  - `POST /api/tags` rewrites an item's tag facets with normalized, deduplicated shorthand labels.
+  - `GET /api/tags` returns tag counts from the local facets index.
+  - Tag updates refresh `analysis_json`, the `facets` table, and FTS metadata so searches can find items by edited tags.
+  - Tag update events record previous/current tags and reasons without raw sensitive content.
+  - Browser item cards now show inline tag chips and a compact `Tags` edit action.
+- Suggest-only filing approval cards were added:
+  - `POST /api/capture` accepts `filing_mode: "suggest"` for text captures.
+  - Suggest-mode captures are stored in `inbox` while preserving the deterministic target category, reason, confidence, and pending status in redacted metadata.
+  - `POST /api/filing-suggestions/accept` applies the pending suggested category, reuses shelf creation, updates FTS/category indexes, records reversible filing state, and appends an acceptance audit event.
+  - Browser capture now has a compact `auto-file` / `suggest` selector.
+  - Browser item cards now show an inline suggested-shelf approval card with an `Accept` action.
+- Context memory maps were added:
+  - `GET /api/context` now returns a `summary` block with node counts, edge counts, root category, category counts, edge-type counts, and cluster count.
+  - `GET /api/context` now returns typed `clusters` for linked context, duplicate-family peers, and replacement paths.
+  - `GET /api/context` now returns `memory_hints` for anticipatory nearby-context messages.
+  - Browser context results now render compact memory-map chips, hints, and grouped cluster rows instead of only a raw text edge dump.
+  - Sensitive graph payloads remain redacted; tests assert fake OpenRouter raw key material is absent from graph JSON.
+- Deterministic likely-next suggestions were added:
+  - Item and search-result payloads now expose safe `next_suggestions` for project shelves, vendor context, duplicate-family review, linked context, associated screenshots, related prompts, replacement successors, pending filing suggestions, and risk review.
+  - Browser item cards now render compact likely-next chips so anticipatory hints are visible on the first usable memory surface.
+  - Suggestion generation uses existing facets, links, duplicate families, replacement state, and risk metadata without model calls or vector storage.
+  - Tests verify fake OpenRouter key material and fake artifact bytes do not leak through suggestion payloads.
+- Local propose/check/apply reuse-safety cards were added:
+  - `SkratchedStore.propose_item_action`, `check_item_action`, and `apply_item_action` create deterministic `skratched.action_card.v1` cards for item reuse decisions.
+  - Action cards expose local-only checks, item risk class, approval requirements, blocked status, and an audit-only reversibility note.
+  - Blocked items cannot be applied, caution/sensitive items require explicit approval, and safe items can be recorded without additional approval.
+  - `GET /api/actions/propose`, `POST /api/actions/check`, and `POST /api/actions/apply` expose the same flow through the local API without executing item content.
+  - Browser item cards now include a compact `Reuse` action that shows the safety card or records an audit-only approval.
+  - Action reasons, cards, API errors, and events are redacted before persistence/return.
+- In-process workflow tests were added:
+  - `tests/test_api_workflows.py` exercises the app API dispatcher without binding a local socket.
+  - Coverage includes capture, linking, memory search, reveal denial/unlock, dry-run export, import preview/apply, screenshot/file capture, replacement browsing, manual filing, and undo filing.
+  - `server.py` now has a shared `dispatch_api` path used by both tests and the HTTP handler, reducing drift between tested API behavior and the running app.
+- Bounded multi-hop context assembly was added:
+  - `GET /api/context` and `SkratchedStore.context_graph` now include direct links plus a bounded second-hop context trail by default.
+  - Graph nodes expose `graph_depth`, graph edges expose `depth`, and third-hop unrelated branches stay out of the default context payload.
+  - Memory-map clusters and hints now include second-hop linked context, so a key can surface its note and the note's associated screenshot/artifact without loading an unbounded graph.
+- Chronological neighboring capture context was added:
+  - Search-result `associated` context now includes computed `previous_capture` and `next_capture` entries when immediate same-project neighbors exist, even without explicit user links.
+  - Explicit user links remain ordered ahead of automatic neighbor context, so direct associations still have priority.
+  - `GET /api/context` now includes `previous_capture` and `next_capture` graph edges plus a `chronological neighbors` cluster.
+  - Neighbor context is serialized through the existing redacted item payload path, so fake OpenRouter key material stays hidden.
+- Tiered memory summaries were added:
+  - `SkratchedStore.memory_summaries()` deterministically creates recent, project, category, and long-horizon rollups from existing redacted item metadata.
+  - Rollups are persisted in the existing `summaries` table with scope metadata, item counts, and deterministic content hashes.
+  - `GET /api/summaries` exposes the rollups through the local API without requiring AI calls or external services.
+  - Fake OpenRouter key material stays redacted in stored and API-returned summary rollups.
+- Broader ranking/time-window perturbation coverage was added:
+  - Search now recognizes equivalent recent-window phrasings such as `past 21 days`, `previous 21 days`, and `three-week window`.
+  - Regression coverage proves those variants keep the recent fake OpenRouter key first, exclude stale matching keys, and do not expose raw fake key material.
+- Weighted FTS scoring was added:
+  - Search now queries `item_fts` directly with sanitized prefix terms and weighted `bm25` over content, preview, category, project, and facets.
+  - Search result scores expose a separate `fts` component, and `why` output includes an explicit `FTS signal`.
+  - FTS diagnostics are stored in `search.executed` events with match counts and redacted query/error details.
+  - FTS failures degrade gracefully to existing exact, metadata, recency, graph/context, and semantic scoring.
+- Filtered recall was added:
+  - Search now parses inline `category:`, `project:`, `tag:`, and `shelf:` refinements and applies them before scoring.
+  - `shelf:` is treated as a category alias for quick shelf-style searches such as `shelf:SQL queries users`.
+  - Applied filters are included in result `filters`, search `why` output, and redacted `search.executed` event payloads.
+  - Filtered searches remain compatible with time windows, metadata scoring, associated context, and local semantic scoring.
+- Long-artifact chunk-manifest import/export parity was added:
+  - Dry-run exports now include a redacted `chunk_manifest` per item with only safe boundary/hash metadata: chunk index, start, end, length, overlap, and digest.
+  - Export bundles still omit chunk body text; restored redacted records preserve chunk metadata for later context assembly without restoring full raw content.
+  - Import preview validates chunk-manifest count, ordering, boundaries, overlap, and hash shape even if the bundle hash has been recomputed, so malformed redacted bundles fail before apply.
+- Safe JSONL export/import was added:
+  - `build_jsonl_export` emits a redacted JSONL manifest line, item record lines, and a footer with the existing bundle hash.
+  - Exported items now include deterministic `export_entry_...` IDs derived from item identity and content hash, separate from the local item ID.
+  - `parse_jsonl_export` reconstructs the existing bundle boundary and verifies manifest schema, item ordering/counts, entry IDs, footer hash, and chunk manifests before preview/apply.
+  - Import preview reports both `entry_id` and `item_id`, while old redacted bundles without entry IDs remain compatible after hash verification.
+  - `POST /api/export/jsonl`, `POST /api/import/jsonl/preview`, and `POST /api/import/jsonl` expose the JSONL path through the local API.
+  - Browser export now previews JSONL text, and import accepts either legacy redacted bundle JSON or JSONL.
+- Atomic local JSONL export-file saves were added:
+  - `write_jsonl_export_file` writes verified JSONL bundles under the local data directory by default.
+  - File writes use same-directory temporary files, atomic replacement, and owner-only `0600` permissions.
+  - Saved export reports include schema, path, byte count, file hash, bundle hash, and item count without raw sensitive label material.
+  - `POST /api/export/jsonl/save` exposes the same safe local save path without accepting arbitrary destination paths.
+  - `export.file_written` events record redacted save metadata in the append-only event hash chain.
+- Structured import failure diagnostics were added:
+  - Import preview/apply failures return `skratched.error_diagnostic.v1` with redacted detail, storage, FTS index, redaction, optional AI status, and retry options.
+  - Browser import catches diagnostics and renders a diagnostic card instead of surfacing an opaque request error.
+  - Diagnostics stay redacted for fake key-bearing malformed redacted bundle and JSONL payloads.
+- Deterministic near-duplicate revision linking was added:
+  - New captures are compared to recent same-category captures with a redaction-first lexical Jaccard signal, so revised prompts and repeated secret/key captures can link without a vector database.
+  - Near-duplicate matches add safe item facets, a `near_duplicate` graph edge, a dedicated `near duplicates` context cluster, and an `item.near_duplicate_detected` event without storing raw captured content in the event payload.
+  - Explicit user/context links are ordered ahead of near-duplicate links in search-result associated context, so automatic dedupe hints do not displace direct context.
+- Broader secret-redaction fixtures were added:
+  - Redaction now covers fake `.env`/connection strings such as `DATABASE_URL=postgresql://user:password@host/db`, copied `psql` URLs, bearer authorization headers, `PGPASSWORD=...`, and copied command password flags.
+  - Redaction now also covers fake JSON/YAML secret fields, API-key headers such as `X-API-Key: ...`, and query-string secret parameters such as `?api_key=...`.
+  - Generic secret captures are classified as `API-Keys`/`sensitive`, get secret/credential tags, with raw `content` withheld from default item payloads.
+  - `analyze_capture` now stores metadata-only chunk manifests rather than raw chunk body text in analysis JSON, reducing duplicate raw-secret surfaces while preserving boundary/hash metadata.
+- Redacted event diagnostics were added:
+  - All event payloads now pass through recursive redaction before SQLite persistence, so search queries and user-supplied action reasons keep context without storing fake secret values.
+- Capture/search/index lifecycle timing diagnostics were added:
+  - `capture.created` events now include a `lifecycle: capture` payload and timing fields for total, analysis, and FTS index update work.
+  - Captures now emit `index.updated` events for `item_fts` upserts with indexed field names and bounded timing metadata.
+  - `search.executed` events now include a `lifecycle: search` payload and timing fields for total, FTS, and scoring work.
+  - Timing diagnostics remain on redacted event payloads and do not include fake raw key material.
+- Saved demo flow was added:
+  - `python scripts/demo_flow.py` creates a temporary local store, seeds fake recent/stale OpenRouter key records plus associated context, and runs the exact `GOAL.md` example query.
+  - The demo prints `skratched.demo_flow.v1` JSON proving the recent key ranks first, associated context is present, the stale key is excluded, and fake raw key material is redacted.
+  - `tests/test_demo_flow.py` executes the script as a subprocess so the demo command remains part of the automated proof surface.
+- Property/differential invariant coverage was added:
+  - `tests/test_property_invariants.py` checks dedupe and redaction invariants across fake OpenRouter, database URL, bearer-header, and JSON secret variants.
+  - The same module compares redacted bundle import and JSONL import paths for equivalent restored searchable metadata.
+  - Long-artifact chunk manifests are checked across multiple sizes for monotonic boundaries, overlap metadata, hash shape, and absence of chunk body text.
+  - Cyclic context graphs are checked for bounded graph depth, deduped nodes, linked-context clusters, and fake raw key redaction.
+- Reusable real-browser UI smoke was added:
+  - `scripts/browser_smoke.mjs` launches local Chromium with a temporary profile and drives the actual browser UI through capture, search, and context-view flows.
+  - The smoke emits `skratched.browser_smoke.v1` JSON and checks that fake OpenRouter key material is absent from result text and final DOM.
+- Append-only event integrity was added:
+  - Events now store `previous_event_hash` and `event_hash` values over redacted payload JSON plus stable event metadata.
+  - Existing local databases get event-integrity columns and a deterministic backfill on store initialization.
+  - `SkratchedStore.event_integrity_report()` verifies the chain in insertion order and returns redacted failure details for direct payload tampering.
+  - `/api/health` now exposes `event_integrity` and includes the chain verdict in the overall local health status.
+- Stable URL reference metadata was added:
+  - Captures now extract `http`/`https` references into safe facets with deterministic `ref_...` IDs, redacted canonical URLs, and host metadata.
+  - Redacted exports preserve URL reference facets, and restored imports remain searchable by URL host/path metadata without restoring raw content.
+- Deterministic item risk classes were added:
+  - Captures now expose `risk_class` and `risk_reasons` for `safe`, `caution`, `sensitive`, and `blocked` items.
+  - Representative mappings include benign notes as `safe`, SQL/database operations as `caution`, secret-like captures as `sensitive`, and destructive filesystem commands such as `rm -rf / --no-preserve-root` as `blocked`.
+  - Redacted exports preserve safe risk metadata and restored imports expose the same risk class.
+- Structured local health diagnostics were added:
+  - `GET /api/health` now reports storage status, table inventory, item/artifact/event counts, FTS index freshness, deterministic search queryability, redaction probe status, event hash-chain integrity, and optional AI availability.
+  - Health checks are local-only and keep optional AI non-required, so deterministic capture and search remain valid without cloud credentials.
+- Optional AI schema validation and fallback were added:
+  - `skratched.ai` defines a schema-versioned optional AI result contract, validates category/tags/summary/confidence/reason fields, and redacts diagnostics before storage.
+  - `SkratchedStore.capture` accepts an explicit `ai_adapter` callable and `ai_provider` label; no network call is made unless a caller supplies an adapter.
+  - Valid fake-adapter output can safely merge a suggested category, normalized tags, summary, confidence, and reason into indexed item metadata.
+  - Invalid schemas and adapter exceptions fall back to deterministic analysis, record `item.ai_analysis` diagnostics, and do not leak fake OpenRouter key material.
+- Structured API boundary validation was added:
+  - POST API calls now reject non-object JSON payloads before endpoint logic runs.
+  - Required identifier/category fields for link, tag, reveal, replace, refile, suggestion acceptance, and filing undo endpoints now return safe 400 responses instead of uncaught `KeyError`/tracebacks.
+  - Screenshot scan/watch numeric inputs validate bounded `limit`, `max_cycles`, and `interval_seconds` values before watcher or filesystem work starts.
+  - Error responses and dry-run export labels are redacted, so user-supplied fake OpenRouter key material cannot leak through diagnostics or bundle metadata.
+- Explicit configuration precedence and fallback rules were added:
+  - `skratched.config` resolves settings in the order `CLI > env > JSON config file > defaults`.
+  - Server and screenshot watcher CLI entrypoints now share the same resolver for host, port, database path, screenshot directory, watcher interval, watcher limit, and max cycles.
+  - Missing config files fall back to defaults, invalid numeric values fail closed, config symlink paths are rejected, and config summaries redact secret-shaped values.
+  - Config saves use atomic temp-file replacement and owner-only `0600` permissions.
+- Verification passed:
+  - `python -m unittest discover -s tests` now runs 117 tests.
+  - `python -m py_compile server.py skratched/__init__.py skratched/ai.py skratched/analyze.py skratched/config.py skratched/storage.py skratched/export.py skratched/semantic.py skratched/watcher.py`
+  - `node --check static/app.js`
+  - `node --check scripts/browser_smoke.mjs`
+  - `node scripts/browser_smoke.mjs --base-url http://127.0.0.1:8787` returned `skratched.browser_smoke.v1` with `ok=true`, verified capture, search, context view, memory-map rendering, and DOM-level redaction checks.
+  - Local API smoke against `http://127.0.0.1:8787` using a fake OpenRouter key; search/export responses were redacted and did not expose the fake raw key.
+  - Local API smoke for reveal/import: reveal was denied without unlock, allowed with unlock, export stayed redacted, and redacted import succeeded.
+  - Local API smoke for context/replacement: context graph returned associated edges, replacement marked the old item deprecated, successor matched, and graph output deduplicated replacement edges.
+  - Local API smoke for semantic retrieval: `provider credential token for model gateway last 3 weeks` returned a fake OpenRouter API key first with `exact=0.0`, `metadata=4.0`, `semantic=2.245`, one associated context item, and no raw fake key leakage.
+  - Local API smoke for file capture: `/api/capture-file` stored a fake PNG under `data/artifacts`, classified it as `screenshots-products`, made it searchable, and did not expose raw fake bytes in the item JSON.
+  - Local API smoke for import preview/apply: a synthetic redacted bundle previewed as one importable entry, imported once, then previewed as `skip_existing_duplicate`.
+  - Local API smoke for replacement browsing: a fake prompt replacement appeared in `/api/replacements`, and search results marked the old prompt deprecated with a successor and warning reason.
+  - Local API smoke for manual filing: a fake SQL item was refiled to `research`, marked with `manual_filing=true`, then restored to `SQL queries` via `/api/undo-filing`.
+  - Workflow test verification includes full in-process API workflows without requiring loopback permissions.
+  - Local API smoke for shelves: creating `triage-smoke` twice reused the same shelf ID and returned the shelf in categories with count `0`.
+  - Context memory-map tests verify summary counts, edge-type counts, typed clusters, hints, API exposure, and no fake raw OpenRouter key leakage.
+  - Local API smoke for suggest-only filing: a fake OpenRouter key was captured into `inbox`, exposed `API-Keys` as a pending target, accepted through `/api/filing-suggestions/accept`, moved to `API-Keys`, and did not expose the raw fake key.
+  - Local API smoke for screenshot watch scanning: a fake screenshot file was imported from a temp directory, repeat scan skipped it as a duplicate by byte hash, observed path metadata was recorded, and raw fake bytes were not exposed.
+  - Local API smoke for tag editing: a fake OpenRouter item was tagged with normalized shorthand labels, tag counts were exposed, tag search returned the item, and no raw fake key leaked.
+  - Local API smoke for SQL extraction: a SQL capture exposed `insert`/`select` operations and `audit_log`/`users` tables, and search by those facets returned the item.
+  - Local API smoke for code extraction: a Python snippet was captured as `code`, exposed `python` language metadata, `CaptureRouter`/`route_screenshot` symbols, `pathlib.Path` import metadata, and search by symbol/import returned the item.
+  - Local API smoke for expanded code extraction: a TypeScript snippet was captured as `code` with `scoreMemory`/`renderHint` symbols and `./types`/`./rank` imports; a shell script was captured as `code` with `sync_memory` symbol and `set`/`rsync`/`python` command hints; TypeScript symbol/import search returned the captured snippet first.
+  - Focused code extraction tests verify TypeScript typed arrow functions, shell script metadata, malformed JavaScript resilience, and whitespace-stable TypeScript symbol/import metadata.
+  - Import/export integrity tests verify redacted restore preserves SQL operation/table facets for search, restores tag facets into tag counts and FTS, and still applies duplicate-skip behavior.
+  - Mixed-timeline recall tests verify `find my last OpenRouter API keys added in the last 3 weeks` returns the recent key with associated context while excluding stale matching key records.
+  - Saved demo-flow test verifies `python scripts/demo_flow.py` proves the exact OpenRouter-key memory query with redacted JSON output.
+  - Focused weighted FTS tests verify search exposes positive `scores.fts`, result explanations include `FTS signal`, search event FTS diagnostics count matches, and fake raw key material is redacted from secret-bearing FTS diagnostics.
+  - Context assembly and filtered recall tests verify search result `associated` context includes incoming links, chronological previous/next captures, and category/project/tag/shelf refinements, not only root-to-neighbor outgoing links.
+  - Property/differential invariant tests verify dedupe/redaction variants, JSON bundle vs JSONL restore equivalence, chunk-manifest invariants across sizes, and bounded/deduped cyclic context graphs.
+  - Tiered summary tests verify recent, project, category, and long-horizon rollups persist with deterministic hashes and stay redacted through `/api/summaries`.
+  - Ranking perturbation tests verify noisy punctuation/case variants of the OpenRouter-key query keep the same top key result and do not leak raw fake key material.
+  - Local API smoke for bidirectional associated context: a note linked into an OpenRouter key appeared in the key search result's `associated` list with `link_type=used_with` and `link_direction=incoming`.
+  - Local API smoke for metadata-preserving export: a SQL item tagged with `roundtrip-smoke`/`sql-restore` exported safe facets including SQL operations, SQL tables, and tags while excluding local path/fingerprint facets.
+  - Local CLI smoke for screenshot watcher: `python -m skratched.watcher ... --max-cycles 2 --interval 0` imported a fake screenshot on the first cycle and skipped the duplicate byte hash on the second cycle.
+  - Local API smoke for bounded screenshot watcher: `POST /api/screenshots/watch-run` completed 2 cycles, imported one fake screenshot, skipped the duplicate byte hash on the second cycle, and returned zero errors.
+  - Focused context/search API smoke: an in-process `GET /api/context` call returned a 3-node two-hop graph, `OpenRouter token previous 21 days` returned the fake API-key item first, and the raw fake key did not appear in encoded JSON.
+  - Focused chunk-manifest import/export smoke: a long fake prompt exported a 3-entry chunk manifest, imported one redacted record, restored matching chunk metadata, and did not leak the late full-content marker.
+  - Focused near-duplicate smoke: a revised fake prompt capture produced one `near_duplicate` edge, one `item.near_duplicate_detected` audit event, and a `near duplicates` context cluster.
+  - Focused generic-secret redaction smoke: fake database URL and bearer-token capture was classified sensitive, default item output withheld `content`, export output stayed redacted, and raw fake secret substrings did not leak.
+  - Focused health diagnostics smoke: in-process `/api/health` returned `ok=true`, one captured item, fresh FTS index status, search availability, passing redaction probes, passing event integrity, and `optional_ai.required=false`.
+  - Focused event-integrity smoke: clean event chains verified with 64-character head hashes, and direct payload tampering produced an `event_hash_mismatch` report with fake OpenRouter key material redacted.
+  - Focused optional AI smoke: valid fake-adapter output validated and indexed `ai-routing`/`follow-up` tags with an `item.ai_analysis` event; invalid schema and adapter exceptions fell back to deterministic `API-Keys` classification while redacting fake OpenRouter key material.
+  - Focused structured-secret redaction smoke: fake JSON, YAML, API-key header, and query-string secret variants were classified `API-Keys`/`sensitive`; default item and export payloads stayed redacted and omitted raw fake values.
+  - Focused event-diagnostics smoke: fake OpenRouter search queries and fake JSON-style action reasons were absent from stored event payloads while redaction markers remained.
+  - Focused lifecycle diagnostics tests: capture/search/index events expose timing metadata, capture emits an `index.updated` FTS event, and fake raw key material is absent from diagnostics.
+  - Focused URL-reference smoke: a fake URL with an `api_key` query parameter exported a deterministic `ref_...` ID and `docs.example.test` host, omitted the raw query secret, imported as a redacted record, and remained searchable by host/path.
+  - Focused risk-class smoke: representative safe note, SQL query, fake OpenRouter key, and destructive filesystem command produced `safe`, `caution`, `sensitive`, and `blocked` risk classes, and the blocked class survived redacted export/import.
+  - Focused action-safety tests: destructive command reuse is blocked, SQL/caution reuse requires approval, approved reuse records an audit-only `action.applied` event, and fake raw key material is absent from action cards, events, and API errors.
+  - Focused API boundary validation tests: non-object POST bodies, missing required identifiers, invalid watcher/scan numeric values, and user-supplied secret-bearing export labels return safe/redacted behavior without tracebacks.
+  - Focused config tests: `CLI > env > file > defaults` precedence, missing-file fallback, redacted summaries, invalid numeric rejection, symlink config-path rejection, and owner-only atomic config writes all pass.
+  - Focused likely-next suggestion tests: linked context, associated screenshots, duplicate families, vendor/project context, and replacement successors produce safe `next_suggestions` on item/search payloads without fake raw key or artifact-byte leakage.
+  - Focused JSONL export/import tests: manifest/item/footer shape, stable export entry IDs, bundle-hash verification, redacted restore, API duplicate-skip behavior, and tamper rejection all pass without fake raw key leakage.
+  - Focused JSONL export-file save tests: library and API workflows save parseable verified JSONL under the local data directory with `0600` permissions, no temp-file residue, redacted report/event labels, file hashes, and no fake raw key leakage.
+  - Focused import failure diagnostic tests: malformed redacted bundle and JSONL preview requests return schema-versioned diagnostics with storage, FTS, redaction, and retry details while redacting fake raw key material.
+  - Focused item edit/version-history tests: storage and API workflows create `edited_to` successor chains, expose ordered version history, mark old items deprecated, surface typed context edges, and keep fake raw key material out of events/history payloads.
+
+## Where We Left Off
+
+The first app slice is running locally. Continue by expanding the vertical slice toward the full `GOAL.md` proof-of-done instead of returning to planning.
+
+## Recommended Next Build Slice
+
+1. Add optional native global hotkey wrapper around the screenshot watcher if macOS automation is explicitly approved.
+2. Add optional generated-artifact parity gates.
+3. Run a completion audit against `GOAL.md` before packaging or handoff.
+
+The concrete CAM KB acceptance criteria now live in `GOAL.md` under `Proof Of Done`; use that section as the source of truth for the first build slice.
+
+## Assumptions
+
+- Core app behavior must work without CAM at runtime.
+- Optional semantic scoring is allowed, but metadata, FTS, graph links, duplicate families, recency, and explainable ranking remain the primary recall stack.
+- Real secrets must not be imported into fixtures or logs.

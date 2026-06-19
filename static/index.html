@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Skratched</title>
+    <link rel="stylesheet" href="/styles.css">
+  </head>
+  <body>
+    <main class="shell">
+      <section class="workspace" aria-label="Skratched workspace">
+        <header class="topbar">
+          <div>
+            <h1>Skratched</h1>
+            <p id="health">Local memory starting...</p>
+          </div>
+          <div class="actions">
+            <button id="exportButton" type="button" title="Preview redacted export">Export Preview</button>
+            <button id="refreshButton" type="button" title="Refresh memory">Refresh</button>
+          </div>
+        </header>
+
+        <section class="capture-area" aria-label="Capture">
+          <div class="scratch">
+            <textarea id="captureText" spellcheck="false" placeholder="Paste, type, or drop a snippet"></textarea>
+            <div class="capture-footer">
+              <input id="projectInput" aria-label="Project" placeholder="project">
+              <select id="sourceInput" aria-label="Source">
+                <option value="manual">manual</option>
+                <option value="clipboard">clipboard</option>
+                <option value="screenshot-work">screenshot-work</option>
+                <option value="import">import</option>
+              </select>
+              <select id="filingModeInput" aria-label="Filing mode">
+                <option value="auto">auto-file</option>
+                <option value="suggest">suggest</option>
+              </select>
+              <input id="fileInput" class="visually-hidden" type="file" multiple>
+              <button id="fileButton" class="secondary" type="button" title="Attach file or screenshot">Attach</button>
+              <button id="captureButton" type="button">Capture</button>
+            </div>
+          </div>
+          <aside class="side">
+            <h2>Quick Picks</h2>
+            <div id="categoryChips" class="chips"></div>
+            <h2>Likely Next</h2>
+            <div id="likelyNext" class="quiet-list"></div>
+            <h2>Bundle</h2>
+            <div class="bundle-actions">
+              <button id="shelfButton" class="secondary" type="button" title="Create shelf">Shelf</button>
+              <button id="scanScreenshotsButton" class="secondary" type="button" title="Scan screenshot folder">Scan Shots</button>
+              <button id="importButton" class="secondary" type="button" title="Import redacted bundle">Import</button>
+              <button id="replacementsButton" class="secondary" type="button" title="Browse deprecated replacements">Replacements</button>
+            </div>
+          </aside>
+        </section>
+
+        <section class="search-area" aria-label="Search">
+          <input id="searchInput" placeholder="find my last OpenRouter API keys added in the last 3 weeks">
+          <button id="searchButton" type="button">Find</button>
+        </section>
+
+        <section class="memory-grid" aria-label="Memory">
+          <div>
+            <h2>Results</h2>
+            <div id="results" class="items"></div>
+          </div>
+          <div>
+            <h2>Recent</h2>
+            <div id="recent" class="items"></div>
+          </div>
+        </section>
+      </section>
+    </main>
+    <script src="/app.js"></script>
+  </body>
+</html>
