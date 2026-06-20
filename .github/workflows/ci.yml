@@ -30,11 +30,14 @@ jobs:
       - name: Check console entrypoint
         run: skratched-server --help
 
+      - name: Check MCP server module imports
+        run: python -c "import skratched.mcp_server"
+
       - name: Run unit tests
         run: python -m unittest discover -s tests
 
       - name: Compile Python modules
-        run: python -m py_compile server.py scripts/demo_flow.py skratched/__init__.py skratched/ai.py skratched/analyze.py skratched/config.py skratched/storage.py skratched/export.py skratched/semantic.py skratched/watcher.py skratched/cli.py
+        run: python -m py_compile server.py scripts/demo_flow.py skratched/__init__.py skratched/ai.py skratched/analyze.py skratched/config.py skratched/storage.py skratched/export.py skratched/semantic.py skratched/watcher.py skratched/cli.py skratched/mcp_server.py
 
       - name: Check browser app JavaScript
         run: node --check static/app.js

@@ -12,10 +12,13 @@ license = { text = "Proprietary" }
 authors = [
   { name = "deesatzed" }
 ]
-dependencies = []
+dependencies = [
+  "mcp>=1.28.0",
+]
 
 [project.scripts]
 skratched-server = "skratched.cli:main"
+skratched-mcp = "skratched.mcp_server:main"
 
 [tool.setuptools]
 packages = ["skratched"]

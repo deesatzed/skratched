@@ -18,6 +18,8 @@ class PackagingTests(unittest.TestCase):
         self.assertEqual(data["project"]["name"], "skratched")
         self.assertEqual(data["project"]["version"], "0.1.0")
         self.assertEqual(data["project"]["scripts"]["skratched-server"], "skratched.cli:main")
+        self.assertEqual(data["project"]["scripts"]["skratched-mcp"], "skratched.mcp_server:main")
+        self.assertIn("mcp>=1.28.0", data["project"]["dependencies"])
         self.assertIn("server", data["tool"]["setuptools"]["py-modules"])
         self.assertIn("static/*.html", data["tool"]["setuptools"]["data-files"]["static"])
         self.assertIn("static/*.js", data["tool"]["setuptools"]["data-files"]["static"])
@@ -37,6 +39,12 @@ class PackagingTests(unittest.TestCase):
         )
 
         self.assertIn("Run the local Skratched app", result.stdout)
+
+    def test_mcp_server_module_imports_without_starting_server(self):
+        module = importlib.import_module("skratched.mcp_server")
+
+        self.assertTrue(callable(module.main))
+        self.assertTrue(callable(module.build_app))
 
 
 if __name__ == "__main__":

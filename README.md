@@ -128,17 +128,77 @@ The default JSON config path is `data/skratched.json`. Config writes use an atom
 
 Saved JSONL exports are written under `data/exports` by default. Export file writes use same-directory temp files, atomic replace, and owner-only `0600` permissions; user-supplied labels are redacted before they reach filenames, reports, or events.
 
+## MCP Server
+
+Skratched ships an MCP (Model Context Protocol) server so Claude Code, Codex, or any MCP-capable agent can search, capture, and inspect local memory mid-session over a typed tool interface instead of hand-rolled HTTP calls. It runs as a local stdio subprocess against the same `SkratchedStore`/`data/skratched.db` the browser server uses — no extra port, no second copy of the data.
+
+### Tools
+
+| Tool | What it does |
+| --- | --- |
+| `skratched_health_tool` | Cheap pre-flight check that the local store is reachable and healthy. |
+| `skratched_search_tool` | Redacted recall. Call this before assuming something hasn't been solved before. |
+| `skratched_context_tool` | Associated links, duplicates, and neighbors for a search result item. |
+| `skratched_capture_tool` | Persist a decision, workaround, or root cause worth remembering across sessions. |
+| `skratched_workspace_scan_tool` | Metadata-only Workspace Scout preview of a pre-approved root (see below). Never returns file content and never captures. |
+| `skratched_reveal_tool` | Reveal a real secret value. Always blocks on a human confirmation prompt first; see Reveal Confirmation below. |
+
+Export/import, filing/shelf mutation, action propose/check/apply, and screenshot watcher control are intentionally not exposed over MCP. These either mutate significant state or have no clear "agent reaches for this mid-task" justification yet.
+
+### Register with an MCP client
+
+Run directly:
+
+```bash
+skratched-mcp
+```
+
+Or register it with an MCP client's config (Claude Code's `.mcp.json`, Codex's MCP config, etc.) as a stdio server:
+
+```json
+{
+  "mcpServers": {
+    "skratched": {
+      "command": "skratched-mcp"
+    }
+  }
+}
+```
+
+It honors the same `SKRATCHED_CONFIG`/`SKRATCHED_DB` environment variables documented above, so it reads/writes the same store as a `skratched-server` instance you already have running.
+
+### Workspace Scout root allowlist
+
+`skratched_workspace_scan_tool` only scans roots that resolve under `SKRATCHED_MCP_ALLOWED_ROOTS`, a `:`-delimited (`;`-delimited on Windows) list of approved local directories set once via environment variable:
+
+```bash
+export SKRATCHED_MCP_ALLOWED_ROOTS="$HOME/Desktop:$HOME/Projects"
+```
+
+A scan request for a root outside this list, or a symlink that escapes it, fails closed with an error naming the env var. There is no per-call approval UI for this tool — set the allowlist once, before launching `skratched-mcp`.
+
+### Reveal confirmation
+
+`skratched_reveal_tool` never returns a real secret value silently. Each call blocks the `skratched-mcp` process on a `y/N` prompt printed to its own terminal:
+
+```text
+[skratched] An agent is requesting to reveal item <id> (<reason>).
+Allow this one-time reveal? [y/N]:
+```
+
+If you answer anything other than `y`/`yes`, if the process has no attached terminal (e.g. it was launched without a visible TTY), or if the item is unknown, the tool returns `{"confirmed": false}` and no real value is ever exposed to the agent. A confirmed reveal is logged as an `item.revealed` audit event in the same hash-chained event log `/api/reveal` already uses; a decline is logged as `item.reveal_denied`. Expect a visible prompt mid-session if an agent calls this tool — that pause is the point.
+
 ## Verify
 
 ```bash
 python -m unittest discover -s tests
-python -m py_compile server.py scripts/demo_flow.py skratched/__init__.py skratched/ai.py skratched/analyze.py skratched/config.py skratched/storage.py skratched/export.py skratched/semantic.py skratched/watcher.py skratched/cli.py
+python -m py_compile server.py scripts/demo_flow.py skratched/__init__.py skratched/ai.py skratched/analyze.py skratched/config.py skratched/storage.py skratched/export.py skratched/semantic.py skratched/watcher.py skratched/cli.py skratched/mcp_server.py
 node --check static/app.js
 node --check scripts/browser_smoke.mjs
 python scripts/demo_flow.py
 ```
 
-CI runs these verification commands on GitHub Actions, along with `python -m pip install -e .` and `skratched-server --help`.
+CI runs these verification commands on GitHub Actions, along with `python -m pip install -e .`, `skratched-server --help`, and `python -c "import skratched.mcp_server"`.
 
 Optional API smoke while the server is running:
 
